@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Forex Trading Bot Dashboard"
+description = "Professional AI Forex Trading Bot dashboard — a React + TypeScript + Tailwind frontend for monitoring AI-driven trading operations, managing settings, viewing logs, and visualizing market data. Connects to a Python FastAPI backend."
+version = "1.0.0"
+id = "artifacts/forex-dashboard"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22059
+
+[services.development]
+run = "pnpm --filter @workspace/forex-dashboard run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/forex-dashboard", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/forex-dashboard/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22059"
+BASE_PATH = "/"

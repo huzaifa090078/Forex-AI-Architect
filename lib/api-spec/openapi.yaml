@@ -2,21 +2,40 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.1.0
-  description: API specification
+  version: 1.0.0
+  description: AI Forex Trading Bot – REST API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
+    description: Service health
+  - name: auth
+    description: Authentication & session management
+  - name: dashboard
+    description: Dashboard summary & performance
+  - name: trades
+    description: Trade lifecycle management
+  - name: signals
+    description: AI-generated trading signals
+  - name: market
+    description: Market scanner & pair data
+  - name: backtests
+    description: Strategy backtesting
+  - name: news
+    description: Economic news & calendar
+  - name: settings
+    description: Bot & risk configuration
+  - name: logs
+    description: System event logs
+
 paths:
+  # ─── Health ────────────────────────────────────────────────
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +43,1091 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ─── Auth ──────────────────────────────────────────────────
+  /v1/auth/login:
+    post:
+      operationId: authLogin
+      tags: [auth]
+      summary: Login and obtain JWT tokens
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Tokens
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenPair"
+        "401":
+          description: Invalid credentials
+
+  /v1/auth/register:
+    post:
+      operationId: authRegister
+      tags: [auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterInput"
+      responses:
+        "201":
+          description: Created user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "409":
+          description: Email already exists
+
+  /v1/auth/refresh:
+    post:
+      operationId: authRefresh
+      tags: [auth]
+      summary: Refresh access token using refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshInput"
+      responses:
+        "200":
+          description: New token pair
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenPair"
+
+  /v1/auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Return the authenticated user profile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+
+  # ─── Dashboard ─────────────────────────────────────────────
+  /v1/dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Key account & trading KPIs
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /v1/dashboard/performance:
+    get:
+      operationId: getDashboardPerformance
+      tags: [dashboard]
+      summary: Equity curve and PnL series for charting
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [1d, 7d, 30d, 90d, 1y, all]
+            default: 30d
+      responses:
+        "200":
+          description: Time-series performance data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PerformancePoint"
+
+  # ─── Trades ────────────────────────────────────────────────
+  /v1/trades:
+    get:
+      operationId: getTrades
+      tags: [trades]
+      summary: Paginated list of trades
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: number
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: number
+            default: 50
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, closed, cancelled, all]
+            default: all
+        - name: pair
+          in: query
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: Paginated trades
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedTrades"
+
+    post:
+      operationId: createTrade
+      tags: [trades]
+      summary: Open a new manual trade record
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TradeInput"
+      responses:
+        "201":
+          description: Created trade
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Trade"
+
+  /v1/trades/stats:
+    get:
+      operationId: getTradeStats
+      tags: [trades]
+      summary: Aggregate trade statistics
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Trade statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TradeStats"
+
+  /v1/trades/{id}:
+    get:
+      operationId: getTrade
+      tags: [trades]
+      summary: Get a single trade by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Trade
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Trade"
+        "404":
+          description: Not found
+
+    patch:
+      operationId: updateTrade
+      tags: [trades]
+      summary: Update a trade (SL/TP/notes)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TradeUpdate"
+      responses:
+        "200":
+          description: Updated trade
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Trade"
+
+    delete:
+      operationId: deleteTrade
+      tags: [trades]
+      summary: Cancel / delete a trade record
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  # ─── Signals ───────────────────────────────────────────────
+  /v1/signals:
+    get:
+      operationId: getSignals
+      tags: [signals]
+      summary: Paginated list of AI-generated signals
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: number
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: number
+            default: 50
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, executed, expired, rejected, all]
+            default: all
+      responses:
+        "200":
+          description: Paginated signals
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedSignals"
+
+  /v1/signals/active:
+    get:
+      operationId: getActiveSignals
+      tags: [signals]
+      summary: All currently active (pending) signals
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Active signals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Signal"
+
+  /v1/signals/{id}:
+    get:
+      operationId: getSignal
+      tags: [signals]
+      summary: Get a single signal by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Signal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Signal"
+        "404":
+          description: Not found
+
+  # ─── Market ────────────────────────────────────────────────
+  /v1/market/pairs:
+    get:
+      operationId: getMarketPairs
+      tags: [market]
+      summary: All tracked currency pairs with live quote data
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Market pairs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MarketPair"
+
+  /v1/market/scan:
+    get:
+      operationId: scanMarket
+      tags: [market]
+      summary: Run the market scanner and return opportunities
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Scanner results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MarketOpportunity"
+
+  # ─── Backtests ─────────────────────────────────────────────
+  /v1/backtests:
+    get:
+      operationId: getBacktests
+      tags: [backtests]
+      summary: List all backtest runs
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Backtests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Backtest"
+
+    post:
+      operationId: createBacktest
+      tags: [backtests]
+      summary: Queue a new backtest run
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BacktestInput"
+      responses:
+        "202":
+          description: Backtest queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Backtest"
+
+  /v1/backtests/{id}:
+    get:
+      operationId: getBacktest
+      tags: [backtests]
+      summary: Get a backtest run and its results
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Backtest
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Backtest"
+        "404":
+          description: Not found
+
+  # ─── News ──────────────────────────────────────────────────
+  /v1/news:
+    get:
+      operationId: getNews
+      tags: [news]
+      summary: Economic calendar events and news feed
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: impact
+          in: query
+          schema:
+            type: string
+            enum: [low, medium, high, all]
+            default: all
+        - name: currency
+          in: query
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: News items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NewsItem"
+
+  /v1/news/upcoming:
+    get:
+      operationId: getUpcomingNews
+      tags: [news]
+      summary: High-impact events in the next 24 hours
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Upcoming high-impact news
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NewsItem"
+
+  # ─── Settings ──────────────────────────────────────────────
+  /v1/settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Retrieve bot & risk configuration
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BotSettings"
+
+    patch:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Update bot & risk configuration
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BotSettingsUpdate"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BotSettings"
+
+  # ─── Logs ──────────────────────────────────────────────────
+  /v1/logs:
+    get:
+      operationId: getLogs
+      tags: [logs]
+      summary: Paginated system event log
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: number
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: number
+            default: 100
+        - name: level
+          in: query
+          schema:
+            type: string
+            enum: [debug, info, warning, error, critical, all]
+            default: all
+        - name: module
+          in: query
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: Paginated logs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedLogs"
+
+  /v1/logs/errors:
+    get:
+      operationId: getErrorLogs
+      tags: [logs]
+      summary: Recent error and critical log entries
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Error logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LogEntry"
+
+# ─── Schemas ─────────────────────────────────────────────────
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
   schemas:
+    # Health
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
 
+    # Auth
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          
+        password:
+          type: string
+          minLength: 8
+
+    RegisterInput:
+      type: object
+      required: [email, password, name]
+      properties:
+        email:
+          type: string
+          
+        password:
+          type: string
+          minLength: 8
+        name:
+          type: string
+
+    RefreshInput:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+
+    TokenPair:
+      type: object
+      required: [accessToken, refreshToken, tokenType, expiresIn]
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        tokenType:
+          type: string
+        expiresIn:
+          type: number
+
+    User:
+      type: object
+      required: [id, email, name, role, createdAt]
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [admin, viewer]
+        createdAt:
+          type: string
+          format: date-time
+
+    # Dashboard
+    DashboardSummary:
+      type: object
+      required: [balance, equity, totalPnl, todayPnl, openTrades, totalTrades, winRate, botStatus]
+      properties:
+        balance:
+          type: number
+        equity:
+          type: number
+        totalPnl:
+          type: number
+        todayPnl:
+          type: number
+        openTrades:
+          type: number
+        totalTrades:
+          type: number
+        winRate:
+          type: number
+        botStatus:
+          type: string
+          enum: [running, paused, stopped, error]
+
+    PerformancePoint:
+      type: object
+      required: [date, equity, pnl, trades]
+      properties:
+        date:
+          type: string
+          format: date
+        equity:
+          type: number
+        pnl:
+          type: number
+        trades:
+          type: number
+
+    # Trades
+    Trade:
+      type: object
+      required: [id, pair, direction, entryPrice, stopLoss, takeProfit, lotSize, status, createdAt]
+      properties:
+        id:
+          type: string
+        pair:
+          type: string
+        direction:
+          type: string
+          enum: [buy, sell]
+        entryPrice:
+          type: number
+        stopLoss:
+          type: number
+        takeProfit:
+          type: number
+        lotSize:
+          type: number
+        status:
+          type: string
+          enum: [open, closed, cancelled]
+        pnl:
+          type: ["number", "null"]
+        riskRewardRatio:
+          type: ["number", "null"]
+        notes:
+          type: ["string", "null"]
+        signalId:
+          type: ["string", "null"]
+        openedAt:
+          type: ["string", "null"]
+          format: date-time
+        closedAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+
+    TradeInput:
+      type: object
+      required: [pair, direction, entryPrice, stopLoss, takeProfit, lotSize]
+      properties:
+        pair:
+          type: string
+        direction:
+          type: string
+          enum: [buy, sell]
+        entryPrice:
+          type: number
+        stopLoss:
+          type: number
+        takeProfit:
+          type: number
+        lotSize:
+          type: number
+        notes:
+          type: string
+        signalId:
+          type: string
+
+    TradeUpdate:
+      type: object
+      properties:
+        stopLoss:
+          type: number
+        takeProfit:
+          type: number
+        lotSize:
+          type: number
+        notes:
+          type: string
+        status:
+          type: string
+          enum: [closed, cancelled]
+        pnl:
+          type: number
+        closedAt:
+          type: string
+          format: date-time
+
+    TradeStats:
+      type: object
+      required: [totalTrades, winningTrades, losingTrades, winRate, totalPnl, avgWin, avgLoss, profitFactor, maxDrawdown, avgRr]
+      properties:
+        totalTrades:
+          type: number
+        winningTrades:
+          type: number
+        losingTrades:
+          type: number
+        winRate:
+          type: number
+        totalPnl:
+          type: number
+        avgWin:
+          type: number
+        avgLoss:
+          type: number
+        profitFactor:
+          type: number
+        maxDrawdown:
+          type: number
+        avgRr:
+          type: number
+
+    PaginatedTrades:
+      type: object
+      required: [items, total, page, limit]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Trade"
+        total:
+          type: number
+        page:
+          type: number
+        limit:
+          type: number
+
+    # Signals
+    Signal:
+      type: object
+      required: [id, pair, direction, confidence, status, createdAt]
+      properties:
+        id:
+          type: string
+        pair:
+          type: string
+        direction:
+          type: string
+          enum: [buy, sell]
+        confidence:
+          type: number
+        entryZoneLow:
+          type: ["number", "null"]
+        entryZoneHigh:
+          type: ["number", "null"]
+        stopLoss:
+          type: ["number", "null"]
+        takeProfit:
+          type: ["number", "null"]
+        riskRewardRatio:
+          type: ["number", "null"]
+        smcPattern:
+          type: ["string", "null"]
+        indicators:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [pending, executed, expired, rejected]
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: ["string", "null"]
+          format: date-time
+
+    PaginatedSignals:
+      type: object
+      required: [items, total, page, limit]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Signal"
+        total:
+          type: number
+        page:
+          type: number
+        limit:
+          type: number
+
+    # Market
+    MarketPair:
+      type: object
+      required: [symbol, bid, ask, spread, change24h, trend]
+      properties:
+        symbol:
+          type: string
+        bid:
+          type: number
+        ask:
+          type: number
+        spread:
+          type: number
+        change24h:
+          type: number
+        volatility:
+          type: ["number", "null"]
+        trend:
+          type: string
+          enum: [bullish, bearish, ranging]
+        updatedAt:
+          type: string
+          format: date-time
+
+    MarketOpportunity:
+      type: object
+      required: [pair, direction, score, smcPattern, timeframe]
+      properties:
+        pair:
+          type: string
+        direction:
+          type: string
+          enum: [buy, sell]
+        score:
+          type: number
+        smcPattern:
+          type: string
+        timeframe:
+          type: string
+        confluenceFactors:
+          type: array
+          items:
+            type: string
+        detectedAt:
+          type: string
+          format: date-time
+
+    # Backtesting
+    BacktestInput:
+      type: object
+      required: [strategyId, pair, fromDate, toDate, initialBalance, lotSize]
+      properties:
+        strategyId:
+          type: string
+        pair:
+          type: string
+        fromDate:
+          type: string
+          format: date
+        toDate:
+          type: string
+          format: date
+        initialBalance:
+          type: number
+        lotSize:
+          type: number
+        riskPerTrade:
+          type: number
+
+    Backtest:
+      type: object
+      required: [id, strategyId, pair, fromDate, toDate, status, createdAt]
+      properties:
+        id:
+          type: string
+        strategyId:
+          type: string
+        pair:
+          type: string
+        fromDate:
+          type: string
+          format: date
+        toDate:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [queued, running, completed, failed]
+        initialBalance:
+          type: ["number", "null"]
+        finalBalance:
+          type: ["number", "null"]
+        totalTrades:
+          type: ["number", "null"]
+        winningTrades:
+          type: ["number", "null"]
+        losingTrades:
+          type: ["number", "null"]
+        winRate:
+          type: ["number", "null"]
+        profitFactor:
+          type: ["number", "null"]
+        maxDrawdown:
+          type: ["number", "null"]
+        netPnl:
+          type: ["number", "null"]
+        sharpeRatio:
+          type: ["number", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: ["string", "null"]
+          format: date-time
+
+    # News
+    NewsItem:
+      type: object
+      required: [id, headline, source, impact, currency, publishedAt]
+      properties:
+        id:
+          type: string
+        headline:
+          type: string
+        source:
+          type: string
+        impact:
+          type: string
+          enum: [low, medium, high]
+        currency:
+          type: string
+        actual:
+          type: ["string", "null"]
+        forecast:
+          type: ["string", "null"]
+        previous:
+          type: ["string", "null"]
+        publishedAt:
+          type: string
+          format: date-time
+
+    # Settings
+    BotSettings:
+      type: object
+      required: [riskPerTrade, maxOpenTrades, maxDailyLoss, allowedPairs, tradingEnabled, mt5Connected]
+      properties:
+        riskPerTrade:
+          type: number
+        maxOpenTrades:
+          type: number
+        maxDailyLoss:
+          type: number
+        allowedPairs:
+          type: array
+          items:
+            type: string
+        tradingEnabled:
+          type: boolean
+        newsFilterEnabled:
+          type: boolean
+        mt5Connected:
+          type: boolean
+        mt5Account:
+          type: ["string", "null"]
+        mt5Server:
+          type: ["string", "null"]
+        minConfidence:
+          type: number
+        defaultLotSize:
+          type: number
+
+    BotSettingsUpdate:
+      type: object
+      properties:
+        riskPerTrade:
+          type: number
+        maxOpenTrades:
+          type: number
+        maxDailyLoss:
+          type: number
+        allowedPairs:
+          type: array
+          items:
+            type: string
+        tradingEnabled:
+          type: boolean
+        newsFilterEnabled:
+          type: boolean
+        mt5Account:
+          type: string
+        mt5Server:
+          type: string
+        minConfidence:
+          type: number
+        defaultLotSize:
+          type: number
+
+    # Logs
+    LogEntry:
+      type: object
+      required: [id, level, module, message, createdAt]
+      properties:
+        id:
+          type: string
+        level:
+          type: string
+          enum: [debug, info, warning, error, critical]
+        module:
+          type: string
+        message:
+          type: string
+        metadata:
+          type: ["object", "null"]
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+
+    PaginatedLogs:
+      type: object
+      required: [items, total, page, limit]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LogEntry"
+        total:
+          type: number
+        page:
+          type: number
+        limit:
+          type: number

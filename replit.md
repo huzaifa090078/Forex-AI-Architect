@@ -1,45 +1,81 @@
-# [Project name]
+# AI Forex Trading Bot
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A production-grade AI-driven Forex trading platform with a React dashboard, Python FastAPI backend, and modular independently-testable components.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+```bash
+# Frontend (managed by Replit workflow)
+pnpm --filter @workspace/forex-dashboard run dev
+
+# API dev stubs (managed by Replit workflow)
+pnpm --filter @workspace/api-server run dev
+
+# Python FastAPI backend (run manually for now)
+cd backend && pip install -r requirements.txt
+cd backend && python main.py
+
+# Push DB schema changes (Drizzle — dev only)
+pnpm --filter @workspace/db run push
+
+# Run Alembic migrations (Python)
+cd backend && alembic upgrade head
+
+# Regenerate API hooks after OpenAPI spec changes
+pnpm --filter @workspace/api-spec run codegen
+```
 
 ## Stack
 
-- pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- **Frontend:** React 19 + TypeScript + Tailwind CSS + Vite (artifacts/forex-dashboard)
+- **Backend:** Python 3.12 + FastAPI + Uvicorn (backend/)
+- **Dev stubs:** Node.js Express (artifacts/api-server) — matches OpenAPI spec for frontend dev
+- **Database:** PostgreSQL + SQLAlchemy (Python) + Drizzle ORM (Node.js stubs)
+- **Auth:** JWT access + refresh tokens via python-jose + bcrypt
+- **AI/ML:** scikit-learn, numpy, pandas (interfaces defined, logic not yet implemented)
+- **Broker:** MetaTrader 5 via Python MetaTrader5 package
+- **API Contract:** OpenAPI 3.1 (lib/api-spec/openapi.yaml) → Orval codegen
 
-## Where things live
+## Where Things Live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `lib/api-spec/openapi.yaml` — **Source of truth** for all API contracts
+- `backend/app/modules/` — All trading logic modules (AI Engine, SMC, Indicators, etc.)
+- `backend/app/db/models.py` — SQLAlchemy ORM models
+- `backend/app/db/schemas.py` — Pydantic v2 request/response schemas
+- `artifacts/api-server/src/routes/stubs.ts` — Dev stub responses (replace with Python in production)
+- `lib/db/src/schema/trading.ts` — Drizzle schema (mirrors Python models)
+- `lib/api-client-react/src/generated/` — Auto-generated React Query hooks (do not edit)
+- `lib/api-zod/src/generated/` — Auto-generated Zod schemas (do not edit)
 
-## Architecture decisions
+## Architecture Decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- **Interface-first** — every module (`ai_engine`, `smc`, `indicators`, `risk_manager`, etc.) exposes an ABC (`IXxx`) so implementations can be swapped without touching callers
+- **Two backends in parallel** — Node.js stubs let the React frontend run immediately; Python FastAPI is the real production backend
+- **OpenAPI as single contract** — `openapi.yaml` gates codegen; hooks are never hand-written
+- **SimulatedMT5Connector** — dev/test without a live Windows MT5 terminal; swap to RealMT5Connector in production
+- **News Filter as kill-switch** — injected at Trade Manager level, not AI Engine, so it suppresses all execution regardless of signal source
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+A professional AI Forex trading bot platform. The dashboard displays live portfolio KPIs, equity curves, AI-generated signals, market scanner results, trade history, backtesting results, economic news, and full bot configuration. Trading logic is not yet implemented — the architecture scaffold is complete.
 
-## User preferences
+## User Preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Python FastAPI for the backend (not Node.js)
+- Full modular architecture with separate folders per concern
+- No fake/demo code — real interfaces only
+- Architecture-first, then implement logic module by module
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- The Node.js API server (`artifacts/api-server`) serves **dev stubs only** — in production, Python FastAPI handles all `/api/v1/*` routes
+- `MetaTrader5` Python package only works on Windows (or Linux + Wine); use `SimulatedMT5Connector` on Replit
+- After any `lib/api-spec/openapi.yaml` change, run `pnpm --filter @workspace/api-spec run codegen` before touching frontend code
+- Alembic migration runner is async — `env.py` uses `asyncio.run()`; standard sync drivers won't work
+- `type: integer` in OpenAPI generates `zod.int()` (Zod v4) which fails typecheck — use `type: number` instead
 
 ## Pointers
 
-- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+- See `README.md` for the full architecture diagram and implementation order
+- See `backend/.env.example` for all required environment variables
+- See the `pnpm-workspace` skill for workspace structure

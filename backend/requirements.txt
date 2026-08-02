@@ -1,0 +1,53 @@
+# ─── Web Framework ───────────────────────────────────────────
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+python-multipart==0.0.20
+
+# ─── Database ────────────────────────────────────────────────
+sqlalchemy==2.0.36
+asyncpg==0.30.0
+alembic==1.14.0
+psycopg2-binary==2.9.10
+
+# ─── Authentication ──────────────────────────────────────────
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-dotenv==1.0.1
+
+# ─── Data Validation ─────────────────────────────────────────
+pydantic==2.10.3
+pydantic-settings==2.6.1
+email-validator==2.2.0
+
+# ─── Async HTTP / WebSockets ─────────────────────────────────
+httpx==0.28.1
+websockets==14.1
+
+# ─── AI / ML (interfaces only — no models included yet) ──────
+numpy==2.2.0
+pandas==2.2.3
+scikit-learn==1.6.0
+
+# ─── MT5 / Broker Integration (stub — requires Windows/Wine) ─
+# MetaTrader5==5.0.4862  # Uncomment on Windows with MT5 installed
+
+# ─── Market Data ─────────────────────────────────────────────
+yfinance==0.2.51
+requests==2.32.3
+
+# ─── Backtesting Framework (interface layer) ─────────────────
+# backtesting==0.3.3   # Uncomment when implementing backtest logic
+
+# ─── News / Economic Calendar ────────────────────────────────
+feedparser==6.0.11
+
+# ─── Scheduling ──────────────────────────────────────────────
+apscheduler==3.11.0
+
+# ─── Logging & Observability ─────────────────────────────────
+structlog==24.4.0
+
+# ─── Development ─────────────────────────────────────────────
+pytest==8.3.4
+pytest-asyncio==0.24.0
+httpx==0.28.1
