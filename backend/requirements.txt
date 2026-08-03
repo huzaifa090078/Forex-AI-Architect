@@ -32,7 +32,6 @@ scikit-learn==1.6.0
 # MetaTrader5==5.0.4862  # Uncomment on Windows with MT5 installed
 
 # ─── Market Data ─────────────────────────────────────────────
-yfinance==0.2.51
 requests==2.32.3
 
 # ─── Backtesting Framework (interface layer) ─────────────────

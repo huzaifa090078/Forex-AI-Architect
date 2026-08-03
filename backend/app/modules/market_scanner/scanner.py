@@ -2,7 +2,7 @@
 Market Scanner — concrete implementation.
 
 Scans 10 configured forex pairs across 5 timeframes using MarketDataService
-(yfinance).  Computes structural indicators (EMA trend, RSI momentum, ATR
+(MT5/Exness).  Computes structural indicators (EMA trend, RSI momentum, ATR
 volatility) to rank and describe market conditions.
 
 No trading logic.  No AI analysis.  No mock data.

@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     AI_INFERENCE_DEVICE: str = Field(default="cpu")
 
     # ── Market Data ──────────────────────────────────────────────────────────
-    MARKET_DATA_PROVIDER: str = Field(default="yfinance")
+    MARKET_DATA_PROVIDER: str = Field(default="mt5")
     ALPHA_VANTAGE_API_KEY: str = Field(default="")
     MARKET_SCAN_INTERVAL_SECONDS: int = Field(default=60)
 

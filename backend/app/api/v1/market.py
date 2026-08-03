@@ -75,7 +75,7 @@ async def get_pairs() -> List[MarketPairOut]:
     """
     Return current bid/ask, spread, 24h change, and trend direction for
     every pair in the configured FOREX_PAIRS list.
-    Data is sourced from yfinance via MarketDataService.
+    Data is sourced from MT5/Exness via MarketDataService.
     """
     results = await asyncio.gather(
         *[_build_pair_out(pair) for pair in FOREX_PAIRS]
