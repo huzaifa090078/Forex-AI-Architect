@@ -10,9 +10,12 @@ import {
   Settings, 
   TerminalSquare,
   LogOut,
-  Hexagon
+  Hexagon,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { useGetDashboardSummary } from "@workspace/api-client-react";
+import { useTheme } from "@/components/theme-provider";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -24,6 +27,21 @@ const NAV_ITEMS = [
   { href: "/logs", label: "Logs", icon: TerminalSquare },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
+
+function ThemeToggle() {
+  const { theme, setTheme } = useTheme();
+  const isDark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  return (
+    <button
+      onClick={() => setTheme(isDark ? "light" : "dark")}
+      className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all duration-200 w-full"
+      aria-label="Toggle theme"
+    >
+      {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+      {isDark ? "Light Mode" : "Dark Mode"}
+    </button>
+  );
+}
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
@@ -83,7 +101,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <div className="p-4 border-t border-sidebar-border bg-sidebar/50">
+        <div className="p-4 border-t border-sidebar-border bg-sidebar/50 space-y-1">
+          <ThemeToggle />
           <Link href="/auth/login" className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all duration-200">
             <LogOut className="w-4 h-4" />
             Sign Out

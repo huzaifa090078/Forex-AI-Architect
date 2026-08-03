@@ -100,7 +100,7 @@ export default function DashboardPage() {
                       dx={-10}
                     />
                     <Tooltip 
-                      contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}
+                      contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
                       itemStyle={{ color: 'hsl(var(--foreground))', fontFamily: 'var(--font-mono)', fontWeight: 'bold' }}
                       labelStyle={{ color: 'hsl(var(--muted-foreground))', fontSize: '12px', marginBottom: '4px' }}
                       formatter={(value: number) => [formatCurrency(value), "Equity"]}

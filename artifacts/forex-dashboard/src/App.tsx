@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { ThemeProvider } from '@/components/theme-provider';
+import { ThemeProvider, useTheme } from '@/components/theme-provider';
 import NotFound from '@/pages/not-found';
 import { Route, Switch, Router as WouterRouter } from 'wouter';
 import { Layout } from '@/components/layout';
@@ -47,15 +47,29 @@ function Router() {
   );
 }
 
+function ThemedToaster() {
+  const { theme } = useTheme();
+  const resolvedTheme = theme === 'system'
+    ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+    : theme;
+  return (
+    <Toaster
+      theme={resolvedTheme as 'dark' | 'light'}
+      position="bottom-right"
+      className="font-mono text-[10px] uppercase tracking-wider font-bold"
+    />
+  );
+}
+
 function App() {
   return (
-    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+    <ThemeProvider defaultTheme="light" storageKey="nexus-ui-theme">
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
             <Router />
           </WouterRouter>
-          <Toaster theme="dark" position="bottom-right" className="font-mono text-[10px] uppercase tracking-wider font-bold" />
+          <ThemedToaster />
         </TooltipProvider>
       </QueryClientProvider>
     </ThemeProvider>
