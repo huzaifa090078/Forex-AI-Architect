@@ -1,42 +1,49 @@
 """
-Market Data Service — yfinance implementation of IMarketDataProvider.
+Market Data Service — MT5/Exness implementation of IMarketDataProvider.
 
-Fetches real OHLCV and tick data from Yahoo Finance.
-No mock data. No fallback stubs. Raises explicitly on data errors.
+Fetches OHLCV and derives tick data exclusively from the configured
+MT5/Exness connector (IMT5Connector).  No external data source is used.
+
+Connector selection (resolved at construction time from settings):
+  - MT5_ACCOUNT > 0  →  RealMT5Connector  (production, requires Windows/Wine)
+  - MT5_ACCOUNT == 0 →  SimulatedMT5Connector (development, returns no data)
+
+Bar format contract (RealMT5Connector must honour this when implemented):
+  Each bar dict must contain the keys:
+    "time"   — ISO-8601 datetime string or Unix timestamp (int/float)
+    "open"   — float
+    "high"   — float
+    "low"    — float
+    "close"  — float
+    "volume" — float  (tick volume or real volume)
+    "spread" — float, optional  (price units; used by get_tick if present)
 """
 
 import asyncio
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
+from app.core.config import settings
 from app.modules.market_scanner.interfaces import IMarketDataProvider
+from app.modules.mt5_integration.interfaces import IMT5Connector
+from app.modules.mt5_integration.base import RealMT5Connector, SimulatedMT5Connector
 
 logger = logging.getLogger(__name__)
 
-# ── Timeframe mapping ────────────────────────────────────────────────────────
-# Internal code → yfinance interval.  H4 is not natively supported by
-# yfinance, so it is fetched as 1h and then resampled.
+# ── MT5 timeframe integer constants ──────────────────────────────────────────
+# Values match the MetaTrader5 Python package (TIMEFRAME_* enum).
+# Defined here to avoid importing the package, which requires Windows.
 
-_SUPPORTED_TIMEFRAMES = {"M1", "M5", "M15", "H1", "H4"}
-
-_YF_INTERVAL: Dict[str, str] = {
-    "M1":  "1m",
-    "M5":  "5m",
-    "M15": "15m",
-    "H1":  "1h",
-    # H4 handled separately — resampled from 1h
+_MT5_TIMEFRAMES: Dict[str, int] = {
+    "M1":  1,
+    "M5":  5,
+    "M15": 15,
+    "H1":  16385,
+    "H4":  16388,
 }
 
-_YF_PERIOD: Dict[str, str] = {
-    "M1":  "1d",
-    "M5":  "5d",
-    "M15": "5d",
-    "H1":  "1mo",
-    "H4":  "60d",   # fetched as 1h, resampled to 4h
-}
-
-# Pip size per pair — used to estimate spread in tick data
+# Pairs priced in JPY have a 2-decimal pip (0.01); all others use 0.0001
 _JPY_PAIRS = {"USDJPY", "EURJPY", "GBPJPY"}
 
 
@@ -44,52 +51,48 @@ def _pip(pair: str) -> float:
     return 0.01 if pair in _JPY_PAIRS else 0.0001
 
 
-def _to_yf_symbol(pair: str) -> str:
-    """Convert internal forex symbol to yfinance ticker (e.g. EURUSD → EURUSD=X)."""
-    return f"{pair}=X"
-
-
-def _flatten_columns(df: "pd.DataFrame") -> "pd.DataFrame":
-    """
-    Newer yfinance versions may return a MultiIndex column frame when a
-    single symbol is downloaded.  Flatten to a plain Index using the first
-    level (field names: Open, High, Low, Close, Volume).
-    """
-    import pandas as pd
-    if isinstance(df.columns, pd.MultiIndex):
-        df = df.copy()
-        df.columns = df.columns.get_level_values(0)
-    return df
-
-
-def _resample_4h(df: "pd.DataFrame") -> "pd.DataFrame":
-    """Resample a 1h OHLCV DataFrame to 4h bars."""
-    df = df.sort_index()
-    resampled = df.resample("4h").agg({
-        "Open":   "first",
-        "High":   "max",
-        "Low":    "min",
-        "Close":  "last",
-        "Volume": "sum",
-    }).dropna(subset=["Open", "Close"])
-    return resampled
+def _close(bar: Dict[str, Any]) -> float:
+    """Extract close price tolerating either lowercase or title-case keys."""
+    v = bar.get("close") if bar.get("close") is not None else bar.get("Close")
+    if v is None:
+        raise KeyError(f"Bar dict has no 'close' key: {list(bar.keys())}")
+    return float(v)
 
 
 # ── MarketDataService ─────────────────────────────────────────────────────────
 
 class MarketDataService(IMarketDataProvider):
     """
-    IMarketDataProvider backed by Yahoo Finance (yfinance ≥ 0.2).
+    IMarketDataProvider backed by the MT5/Exness connector.
 
-    All yfinance I/O is synchronous; every method runs blocking calls
-    inside a thread-pool executor so the asyncio event loop is never blocked.
-
-    Supported timeframes: M1, M5, M15, H1, H4.
+    All connector methods are already declared async; no executor wrapping is
+    needed here.  When RealMT5Connector delegates to the blocking MT5 C-API,
+    it is responsible for running those calls in a thread-pool executor.
     """
 
-    # ------------------------------------------------------------------
-    # IMarketDataProvider — public async interface
-    # ------------------------------------------------------------------
+    def __init__(self, connector: Optional[IMT5Connector] = None) -> None:
+        if connector is not None:
+            self._connector: IMT5Connector = connector
+        elif settings.MT5_ACCOUNT > 0:
+            self._connector = RealMT5Connector()
+        else:
+            self._connector = SimulatedMT5Connector()
+        self._connected = False
+
+    # ── Connection management ─────────────────────────────────────────────────
+
+    async def _ensure_connected(self) -> None:
+        """Lazily connect on first use; raise if the connector refuses."""
+        if not self._connected:
+            ok = await self._connector.connect()
+            if not ok:
+                raise RuntimeError(
+                    "MT5 connector failed to establish a connection. "
+                    "Check MT5_ACCOUNT, MT5_PASSWORD, and MT5_SERVER in settings."
+                )
+            self._connected = True
+
+    # ── IMarketDataProvider ───────────────────────────────────────────────────
 
     async def get_ohlcv(
         self,
@@ -98,130 +101,75 @@ class MarketDataService(IMarketDataProvider):
         count: int,
     ) -> List[Dict[str, Any]]:
         """
-        Fetch the last `count` OHLCV bars for `pair` on `timeframe`.
+        Fetch the last `count` OHLCV bars for `pair` on `timeframe` from MT5.
 
         Raises:
-            ValueError  — unsupported timeframe.
-            RuntimeError — yfinance returned no data.
+            ValueError   — unsupported timeframe string.
+            RuntimeError — MT5 returned no data for this pair/timeframe.
         """
-        if timeframe not in _SUPPORTED_TIMEFRAMES:
+        if timeframe not in _MT5_TIMEFRAMES:
             raise ValueError(
                 f"Unsupported timeframe '{timeframe}'. "
-                f"Supported: {sorted(_SUPPORTED_TIMEFRAMES)}"
+                f"Supported: {list(_MT5_TIMEFRAMES.keys())}"
             )
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(
-            None, self._fetch_ohlcv_sync, pair, timeframe, count
-        )
+
+        await self._ensure_connected()
+
+        mt5_tf = _MT5_TIMEFRAMES[timeframe]
+        bars = await self._connector.get_ohlcv(pair, mt5_tf, count)
+
+        if not bars:
+            raise RuntimeError(
+                f"MT5 returned no OHLCV data for {pair}/{timeframe}."
+            )
+        return bars
 
     async def get_tick(self, pair: str) -> Dict[str, Any]:
         """
-        Return current bid/ask/spread/change for `pair`.
+        Derive current tick data from MT5 H1 OHLCV bars.
 
-        yfinance does not expose a real order book, so:
-          - bid  = last price
-          - ask  = last price + 2-pip typical spread
-          - spread is estimated from pip size (not broker-specific)
+        Since IMT5Connector exposes no dedicated tick endpoint, tick values
+        are derived as follows:
+          - price (bid)  — close of the most recent H1 bar
+          - ask          — bid + spread
+          - spread       — from bar's 'spread' field if present, else 2-pip estimate
+          - change_24h   — (last_close − close_24h_ago) / close_24h_ago × 100
 
         Raises:
-            RuntimeError — yfinance returned no price data.
+            RuntimeError — MT5 returned no data for this pair.
         """
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, self._fetch_tick_sync, pair)
+        await self._ensure_connected()
 
-    # ------------------------------------------------------------------
-    # Synchronous helpers (run in executor)
-    # ------------------------------------------------------------------
+        # 26 H1 bars: bar[-1] = current, bar[-25] = ~24 hours ago
+        mt5_tf = _MT5_TIMEFRAMES["H1"]
+        bars = await self._connector.get_ohlcv(pair, mt5_tf, 26)
 
-    def _fetch_ohlcv_sync(
-        self, pair: str, timeframe: str, count: int
-    ) -> List[Dict[str, Any]]:
-        import pandas as pd
-        import yfinance as yf
-
-        yf_symbol = _to_yf_symbol(pair)
-
-        if timeframe == "H4":
-            # yfinance has no native 4h interval — resample from 1h
-            raw = yf.download(
-                yf_symbol,
-                period=_YF_PERIOD["H4"],
-                interval="1h",
-                progress=False,
-                auto_adjust=True,
-            )
-            if raw.empty:
-                raise RuntimeError(
-                    f"yfinance returned no data for {pair} (1h → H4 resample)"
-                )
-            raw = _flatten_columns(raw)
-            df = _resample_4h(raw)
-        else:
-            interval = _YF_INTERVAL[timeframe]
-            raw = yf.download(
-                yf_symbol,
-                period=_YF_PERIOD[timeframe],
-                interval=interval,
-                progress=False,
-                auto_adjust=True,
-            )
-            if raw.empty:
-                raise RuntimeError(
-                    f"yfinance returned no data for {pair} ({interval})"
-                )
-            df = _flatten_columns(raw)
-            df = df.dropna(subset=["Open", "High", "Low", "Close"])
-
-        df = df.tail(count)
-
-        bars: List[Dict[str, Any]] = []
-        for ts, row in df.iterrows():
-            # Normalise timestamp to an aware UTC datetime
-            if hasattr(ts, "tzinfo") and ts.tzinfo is not None:
-                dt = ts.to_pydatetime()
-            else:
-                dt = pd.Timestamp(ts).tz_localize("UTC").to_pydatetime()
-
-            bars.append({
-                "time":   dt.isoformat(),
-                "open":   float(row["Open"]),
-                "high":   float(row["High"]),
-                "low":    float(row["Low"]),
-                "close":  float(row["Close"]),
-                "volume": float(row.get("Volume", 0.0)),
-            })
-        return bars
-
-    def _fetch_tick_sync(self, pair: str) -> Dict[str, Any]:
-        import yfinance as yf
-
-        yf_symbol = _to_yf_symbol(pair)
-        ticker = yf.Ticker(yf_symbol)
-        info = ticker.fast_info
-
-        price = getattr(info, "last_price", None)
-        if price is None or price != price:   # None or NaN
+        if not bars:
             raise RuntimeError(
-                f"yfinance returned no price for {pair}"
+                f"MT5 returned no data for {pair} — cannot derive tick."
             )
-        price = float(price)
 
-        prev_close = getattr(info, "previous_close", None)
-        if prev_close is not None and prev_close == prev_close and prev_close > 0:
-            change_pct = (price - float(prev_close)) / float(prev_close) * 100.0
+        price = _close(bars[-1])
+
+        # 24h change
+        if len(bars) >= 25:
+            prev = _close(bars[-25])
+            change_pct = ((price - prev) / prev * 100.0) if prev > 0.0 else 0.0
         else:
             change_pct = 0.0
 
-        pip_size = _pip(pair)
-        typical_spread = pip_size * 2          # 2-pip estimate
-        bid = price
-        ask = price + typical_spread
+        # Spread: use bar value if the connector populates it, else estimate
+        raw_spread = bars[-1].get("spread")
+        if raw_spread is not None and float(raw_spread) > 0.0:
+            spread = float(raw_spread)
+        else:
+            spread = _pip(pair) * 2  # 2-pip fallback
 
         return {
             "pair":       pair,
-            "bid":        bid,
-            "ask":        ask,
-            "spread":     typical_spread,
+            "bid":        price,
+            "ask":        price + spread,
+            "spread":     spread,
             "change_24h": change_pct,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
