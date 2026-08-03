@@ -153,24 +153,38 @@ class PaginatedSignalsOut(BaseModel):
 # ─── Market ───────────────────────────────────────────────────────────────────
 
 class MarketPairOut(BaseModel):
+    """
+    Response schema for a live forex pair quote.
+    Fields are aliased to camelCase to match the OpenAPI spec consumed by
+    the Orval-generated frontend client.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
     symbol: str
     bid: float
     ask: float
     spread: float
-    change_24h: float
+    change_24h: float = Field(alias="change24h")
     volatility: Optional[float] = None
     trend: str                         # "bullish" | "bearish" | "ranging"
-    updated_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = Field(default=None, alias="updatedAt")
 
 
 class MarketOpportunityOut(BaseModel):
+    """
+    Response schema for a single market scanner opportunity.
+    Fields are aliased to camelCase to match the OpenAPI spec consumed by
+    the Orval-generated frontend client.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
     pair: str
     direction: str
     score: float
-    smc_pattern: str
+    smc_pattern: str = Field(alias="smcPattern")
     timeframe: str
-    confluence_factors: List[str] = Field(default_factory=list)
-    detected_at: Optional[datetime] = None
+    confluence_factors: List[str] = Field(default_factory=list, alias="confluenceFactors")
+    detected_at: Optional[datetime] = Field(default=None, alias="detectedAt")
 
 
 # ─── Backtests ────────────────────────────────────────────────────────────────
