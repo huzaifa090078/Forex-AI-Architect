@@ -1,19 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { 
-  LayoutDashboard, 
-  LineChart, 
-  Activity, 
-  BarChart2, 
-  History, 
-  Newspaper, 
-  Settings, 
-  TerminalSquare,
-  LogOut,
-  Hexagon,
-  Sun,
-  Moon,
-} from "lucide-react";
+import { LayoutDashboard, ChartLine as LineChart, Activity, ChartBar as BarChart2, Factory as History, Newspaper, Settings, SquareTerminal as TerminalSquare, LogOut, Hexagon, Sun, Moon } from "lucide-react";
 import { useGetDashboardSummary } from "@workspace/api-client-react";
 import { useTheme } from "@/components/theme-provider";
 
@@ -47,7 +34,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   
   // Safe fetch if user might not be logged in, we let it fail gracefully
-  const { data: summary, isLoading } = useGetDashboardSummary({ query: { retry: false } });
+  const { data: summary, isLoading } = useGetDashboardSummary();
 
   const isAuthRoute = location.startsWith("/auth");
 

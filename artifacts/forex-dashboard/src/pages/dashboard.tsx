@@ -1,7 +1,7 @@
 import { useGetDashboardSummary, useGetDashboardPerformance, useGetActiveSignals } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency, formatNumber, formatPercent, cn } from "@/lib/utils";
-import { Activity, DollarSign, Target, TrendingUp, AlertTriangle } from "lucide-react";
+import { Activity, DollarSign, Target, TrendingUp, TriangleAlert as AlertTriangle } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -134,9 +134,9 @@ export default function DashboardPage() {
               <div className="space-y-3">
                 {[1,2,3].map(i => <Skeleton key={i} className="h-16 w-full" />)}
               </div>
-            ) : activeSignals?.items && activeSignals.items.length > 0 ? (
+            ) : activeSignals && activeSignals.length > 0 ? (
               <div className="space-y-3">
-                {activeSignals.items.slice(0, 6).map(signal => (
+                {activeSignals.slice(0, 6).map((signal) => (
                   <div key={signal.id} className="flex items-center justify-between p-3 rounded-md border border-border/50 bg-background/30 hover:bg-muted/30 transition-colors">
                     <div className="flex flex-col gap-1.5">
                       <span className="font-bold text-sm tracking-wide">{signal.pair}</span>
