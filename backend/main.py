@@ -2,6 +2,8 @@
 AI Forex Trading Bot — FastAPI Application Entry Point
 """
 
+import os
+
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -61,10 +63,12 @@ app = create_app()
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    # Replit injects PORT; fall back to APP_PORT from settings for local dev.
+    port = int(os.environ.get("PORT", settings.APP_PORT))
     uvicorn.run(
         "main:app",
         host=settings.APP_HOST,
-        port=settings.APP_PORT,
+        port=port,
         reload=settings.APP_DEBUG,
         log_level=settings.LOG_LEVEL.lower(),
     )
