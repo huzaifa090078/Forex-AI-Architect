@@ -1,12 +1,9 @@
 """
 Market Data Service — MT5/Exness implementation of IMarketDataProvider.
 
-Fetches OHLCV and derives tick data exclusively from the configured
-MT5/Exness connector (IMT5Connector).  No external data source is used.
-
-Connector selection (resolved at construction time from settings):
-  - MT5_ACCOUNT > 0  →  RealMT5Connector  (production, requires Windows/Wine)
-  - MT5_ACCOUNT == 0 →  SimulatedMT5Connector (development, returns no data)
+Fetches OHLCV and derives tick data exclusively from the MT5/Exness connector
+(RealMT5Connector).  No external data source is used.  No simulation or demo
+connector is permitted.
 
 Bar format contract (RealMT5Connector must honour this when implemented):
   Each bar dict must contain the keys:
@@ -24,10 +21,9 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from app.core.config import settings
 from app.modules.market_scanner.interfaces import IMarketDataProvider
 from app.modules.mt5_integration.interfaces import IMT5Connector
-from app.modules.mt5_integration.base import RealMT5Connector, SimulatedMT5Connector
+from app.modules.mt5_integration.base import RealMT5Connector
 
 logger = logging.getLogger(__name__)
 
@@ -71,12 +67,7 @@ class MarketDataService(IMarketDataProvider):
     """
 
     def __init__(self, connector: Optional[IMT5Connector] = None) -> None:
-        if connector is not None:
-            self._connector: IMT5Connector = connector
-        elif settings.MT5_ACCOUNT > 0:
-            self._connector = RealMT5Connector()
-        else:
-            self._connector = SimulatedMT5Connector()
+        self._connector: IMT5Connector = connector if connector is not None else RealMT5Connector()
         self._connected = False
 
     # ── Connection management ─────────────────────────────────────────────────
