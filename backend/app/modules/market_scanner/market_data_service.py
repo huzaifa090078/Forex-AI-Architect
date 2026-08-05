@@ -35,8 +35,10 @@ _MT5_TIMEFRAMES: Dict[str, int] = {
     "M1":  1,
     "M5":  5,
     "M15": 15,
+    "M30": 30,
     "H1":  16385,
     "H4":  16388,
+    "D1":  16408,
 }
 
 # Pairs priced in JPY have a 2-decimal pip (0.01); all others use 0.0001

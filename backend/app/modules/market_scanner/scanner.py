@@ -27,7 +27,7 @@ FOREX_PAIRS: List[str] = [
     "USDCAD", "NZDUSD", "EURJPY", "GBPJPY", "EURGBP",
 ]
 
-TIMEFRAMES: List[str] = ["M1", "M5", "M15", "H1", "H4"]
+TIMEFRAMES: List[str] = ["M1", "M5", "M15", "M30", "H1", "H4", "D1"]
 
 # Minimum bars required before indicators are considered reliable
 _MIN_BARS = 20
