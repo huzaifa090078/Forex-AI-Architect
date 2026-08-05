@@ -19,8 +19,21 @@ from app.db import models  # noqa: F401 — registers all ORM classes
 # Alembic Config object
 config = context.config
 
-# Override sqlalchemy.url from environment variable
+# Override sqlalchemy.url from environment variable.
+# Convert postgresql:// → postgresql+asyncpg:// and strip sslmode (asyncpg
+# does not accept it as a URL parameter).
 database_url = os.environ.get("DATABASE_URL", "")
+if database_url.startswith("postgresql://"):
+    database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+if "?" in database_url:
+    from urllib.parse import urlparse, urlencode, parse_qs, urlunparse
+    _parsed = urlparse(database_url)
+    _params = parse_qs(_parsed.query, keep_blank_values=True)
+    for _k in ("sslmode", "sslcert", "sslkey", "sslrootcert"):
+        _params.pop(_k, None)
+    database_url = urlunparse(_parsed._replace(
+        query=urlencode({k: v[0] for k, v in _params.items()})
+    ))
 config.set_main_option("sqlalchemy.url", database_url)
 
 if config.config_file_name is not None:

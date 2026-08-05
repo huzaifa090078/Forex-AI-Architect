@@ -201,7 +201,7 @@ class SystemLog(Base):
     level: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     module: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     message: Mapped[str] = mapped_column(Text, nullable=False)
-    metadata: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
+    log_metadata: Mapped[Optional[Dict[str, Any]]] = mapped_column("metadata", JSON, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 

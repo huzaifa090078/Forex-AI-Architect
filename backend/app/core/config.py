@@ -32,9 +32,22 @@ class Settings(BaseSettings):
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
     def ensure_asyncpg_scheme(cls, v: str) -> str:
-        """Convert postgresql:// → postgresql+asyncpg:// required by asyncpg."""
-        if isinstance(v, str) and v.startswith("postgresql://"):
-            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        """Convert postgresql:// → postgresql+asyncpg:// and strip params
+        asyncpg doesn't accept (e.g. sslmode)."""
+        if not isinstance(v, str):
+            return v
+        if v.startswith("postgresql://"):
+            v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        # Strip query params unsupported by asyncpg driver
+        if "?" in v:
+            from urllib.parse import urlparse, urlencode, parse_qs, urlunparse
+            parsed = urlparse(v)
+            params = parse_qs(parsed.query, keep_blank_values=True)
+            # asyncpg handles SSL natively; drop driver-incompatible params
+            for key in ("sslmode", "sslcert", "sslkey", "sslrootcert"):
+                params.pop(key, None)
+            new_query = urlencode({k: v[0] for k, v in params.items()})
+            v = urlunparse(parsed._replace(query=new_query))
         return v
     DATABASE_POOL_SIZE: int = Field(default=10)
     DATABASE_MAX_OVERFLOW: int = Field(default=20)

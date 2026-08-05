@@ -66,13 +66,25 @@ A professional AI Forex trading bot platform. The dashboard displays live portfo
 - No fake/demo code — real interfaces only
 - Architecture-first, then implement logic module by module
 
+## Replit Setup (completed)
+
+- **Workflows:** `artifacts/forex-dashboard: web` (port 22059) and `artifacts/api-server: API Server` (port 8000) are configured and running
+- **Secrets set:** `APP_SECRET_KEY`, `JWT_SECRET_KEY` (in Replit Secrets)
+- **Env vars set:** `APP_ENV`, `ALLOWED_ORIGINS=["*"]`, `MARKET_DATA_PROVIDER=yfinance`, and all other non-secret defaults
+- **Database:** Replit managed PostgreSQL — initial Alembic migration applied (`e4b12c5bf3ef_initial_schema`)
+- **To re-run migrations:** `cd backend && python -m alembic upgrade head`
+- **To generate a new migration after model changes:** `cd backend && python -m alembic revision --autogenerate -m "description"`
+
 ## Gotchas
 
-- The Node.js API server (`artifacts/api-server`) serves **dev stubs only** — in production, Python FastAPI handles all `/api/v1/*` routes
-- `MetaTrader5` Python package only works on Windows (or Linux + Wine); use `SimulatedMT5Connector` on Replit
+- The Node.js API server (`artifacts/api-server`) **actually runs the Python FastAPI backend** on Replit — its artifact.toml `run` command is `cd backend && pip install -r requirements.txt -q && python main.py`
+- `DATABASE_URL` from Replit is `postgresql://...` — `config.py` auto-converts it to `postgresql+asyncpg://` and strips `sslmode` (asyncpg doesn't accept that param)
+- Same conversion applies in `app/db/migrations/env.py` for Alembic
+- `MetaTrader5` Python package only works on Windows (or Linux + Wine); use `SimulatedMT5Connector` on Replit (already commented out in `requirements.txt`)
 - After any `lib/api-spec/openapi.yaml` change, run `pnpm --filter @workspace/api-spec run codegen` before touching frontend code
 - Alembic migration runner is async — `env.py` uses `asyncio.run()`; standard sync drivers won't work
 - `type: integer` in OpenAPI generates `zod.int()` (Zod v4) which fails typecheck — use `type: number` instead
+- `metadata` is a reserved SQLAlchemy attribute — the `SystemLog` model uses `log_metadata` as the Python attr mapped to the `metadata` DB column
 
 ## Pointers
 
