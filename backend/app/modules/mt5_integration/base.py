@@ -417,8 +417,37 @@ class RealMT5Connector(IMT5Connector):
 
         Returns bars in ascending time order (oldest first), matching the
         order returned by mt5.copy_rates_from_pos with start_pos=0.
+
+        Bar format contract (required by market_data_service and indicators):
+            "time"        — datetime (UTC)
+            "open"        — float
+            "high"        — float
+            "low"         — float
+            "close"       — float
+            "volume"      — float  (tick volume; required by indicators/calculations.py)
+            "spread"      — float  (price units, not MT5 points; required by market_data_service.get_tick)
+            "tick_volume" — int    (raw MT5 value, kept for completeness)
+            "real_volume" — int    (raw MT5 value, kept for completeness)
         """
         _require_mt5()
+
+        # Fetch symbol point size once to convert spread from MT5 integer points
+        # to price units (e.g. 10 points × 0.00001 = 0.0001 for EURUSD).
+        # market_data_service.get_tick() uses spread as a price-unit offset for
+        # the ask price — passing raw MT5 points would produce ask = bid + 10.0,
+        # which is completely wrong for forex.
+        symbol_info = await self._run(mt5.symbol_info, symbol)
+        if symbol_info is not None:
+            point: float = symbol_info.point
+        else:
+            # symbol_info unavailable — spread will fall back to 0.0, which
+            # causes market_data_service to use its own 2-pip estimate instead.
+            logger.warning(
+                "mt5.symbol_info('%s') returned None; spread will be 0.0 "
+                "(market_data_service will apply its 2-pip fallback).",
+                symbol,
+            )
+            point = 0.0
 
         # start_pos=0 means the most recent bar; the result is oldest-first.
         rates = await self._run(
@@ -433,16 +462,26 @@ class RealMT5Connector(IMT5Connector):
 
         result: List[Dict[str, Any]] = []
         for bar in rates:
+            # "volume" is required by indicators/calculations.py extract_arrays().
+            # Absence causes silent 0.0 fallback, breaking VWAP and OBV for all bars.
+            tick_vol = int(bar["tick_volume"])
+            real_vol = int(bar["real_volume"])
+            spread_pts = int(bar["spread"])
+
             result.append(
                 {
-                    "time": datetime.fromtimestamp(int(bar["time"]), tz=timezone.utc),
-                    "open": float(bar["open"]),
-                    "high": float(bar["high"]),
-                    "low": float(bar["low"]),
-                    "close": float(bar["close"]),
-                    "tick_volume": int(bar["tick_volume"]),
-                    "spread": int(bar["spread"]),
-                    "real_volume": int(bar["real_volume"]),
+                    "time":        datetime.fromtimestamp(int(bar["time"]), tz=timezone.utc),
+                    "open":        float(bar["open"]),
+                    "high":        float(bar["high"]),
+                    "low":         float(bar["low"]),
+                    "close":       float(bar["close"]),
+                    # Required by bar format contract — tick volume as canonical "volume".
+                    "volume":      float(tick_vol),
+                    # Spread in price units (market_data_service contract).
+                    "spread":      float(spread_pts) * point,
+                    # Raw MT5 fields preserved for callers that want them explicitly.
+                    "tick_volume": tick_vol,
+                    "real_volume": real_vol,
                 }
             )
         return result
