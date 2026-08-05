@@ -12,7 +12,7 @@ paths = [ "/" ]
 localPort = 22059
 
 [services.development]
-run = "pnpm --filter @workspace/forex-dashboard run dev"
+run = "pnpm install --frozen-lockfile && pnpm --filter @workspace/forex-dashboard run dev"
 
 [services.production]
 build = [ "pnpm", "--filter", "@workspace/forex-dashboard", "run", "build" ]
