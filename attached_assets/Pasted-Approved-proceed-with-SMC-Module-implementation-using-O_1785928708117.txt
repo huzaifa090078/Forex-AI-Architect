@@ -1,0 +1,89 @@
+Approved — proceed with SMC Module implementation using Option D.
+
+STRICT SCOPE:
+
+Implement ONLY the current SMC Module requirements.
+
+Use the existing ISMCAnalyzer interface and BaseSMCAnalyzer architecture.
+
+IMPORTANT:
+- Do NOT modify backend/app/modules/smc/interfaces.py
+- Do NOT modify backend/app/modules/smc/base.py
+- Do NOT change any existing interface signatures
+- Keep classify_price_zone(pair, current_price) unchanged in the ABC
+- Implement the concrete extension only in the new SMCAnalyzer class using an optional OHLCV parameter
+- No shared mutable state or per-pair context cache
+- Implementation must be stateless and safe for concurrent asyncio calls
+
+Create:
+backend/app/modules/smc/calculations.py
+backend/app/modules/smc/analyzer.py
+
+Update only if necessary:
+backend/app/modules/smc/__init__.py
+
+Implement all 5 existing SMC methods:
+
+1. detect_market_structure()
+   - Detect swing highs/lows
+   - BOS
+   - CHoCH
+
+2. detect_order_blocks()
+   - Bullish order blocks
+   - Bearish order blocks
+   - Breaker blocks where supported by the existing dataclasses/contracts
+
+3. detect_fair_value_gaps()
+   - Three-candle bullish FVG
+   - Three-candle bearish FVG
+
+4. detect_liquidity_levels()
+   - Equal highs
+   - Equal lows
+   - Swing liquidity
+   - Liquidity sweep / stop-hunt detection where supported by existing contracts
+
+5. classify_price_zone()
+   - Preserve the ABC signature
+   - Concrete SMCAnalyzer may accept optional OHLCV
+   - Use the provided OHLCV to derive the relevant swing high/low
+   - Classify Premium / Equilibrium / Discount
+   - Do NOT use shared state
+   - If insufficient context is available, use the safest behavior consistent with the existing Zone contract and document it
+
+Architecture rules:
+- Real market OHLCV only.
+- No mock/fake/demo/simulated data.
+- No external market-data source.
+- No trading logic.
+- No AI/strategy/entry/exit decisions.
+- Use numpy/pandas only if already available and appropriate.
+- Keep calculations pure and testable.
+- Follow the existing Indicators module architecture where appropriate.
+- Do not implement the 5 future indicators from the Indicators module.
+- Do not wire SMC into MarketScanner yet.
+- Do not modify AI Engine yet.
+- Do not add API endpoints yet.
+- Do not modify unrelated modules.
+
+Before implementation, verify the existing SMC dataclasses and method return types so the implementation exactly matches the current contracts.
+
+After implementation:
+1. Run py_compile on every changed SMC file.
+2. Run pyflakes/static checks if available.
+3. Verify no existing interface signatures changed.
+4. Verify no files outside the allowed SMC scope were modified.
+5. Do NOT connect to MT5.
+6. Do NOT execute trades.
+7. Do NOT use live broker credentials.
+
+Then provide an exact implementation report:
+- files changed
+- methods implemented
+- algorithms used
+- contract compatibility
+- static check results
+- any limitations
+
+STOP after the report and ask for approval before any further work.
