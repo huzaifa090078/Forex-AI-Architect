@@ -59,12 +59,13 @@ pnpm --filter @workspace/api-spec run codegen
 
 A professional AI Forex trading bot platform. The dashboard displays live portfolio KPIs, equity curves, AI-generated signals, market scanner results, trade history, backtesting results, economic news, and full bot configuration. Trading logic is not yet implemented — the architecture scaffold is complete.
 
-## User Preferences
+## Project Rules (see RULES.md for full detail)
 
-- Python FastAPI for the backend (not Node.js)
-- Full modular architecture with separate folders per concern
-- No fake/demo code — real interfaces only
-- Architecture-first, then implement logic module by module
+1. **Real MT5/Exness data only** — no demo, fake, mock, stub, or simulated data in any backend logic
+2. **Frontend:** React 19 + TypeScript (no `any`) + Tailwind CSS only
+3. **Backend:** FastAPI + PostgreSQL only — Node.js server is dev scaffolding, not production
+4. **Modular architecture** — each trading concern is an isolated module with an ABC interface
+5. **Secrets via env vars only** — no credentials in source code; all config through `backend/app/core/config.py`
 
 ## Replit Setup (completed)
 
