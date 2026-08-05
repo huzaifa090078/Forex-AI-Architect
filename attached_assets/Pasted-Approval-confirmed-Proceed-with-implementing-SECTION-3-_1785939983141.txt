@@ -1,0 +1,116 @@
+Approval confirmed.
+
+Proceed with implementing SECTION 3 — Market Data Engine, based strictly on the read-only compliance report.
+
+IMPORTANT:
+- Work section-wise only.
+- Do NOT modify Sections 1, 2, 6 (SMC), or 7 (AI Engine) unless absolutely required for Section 3 itself.
+- Do NOT start Section 4, 5, 8, 9, etc.
+- Use ONLY real MT5/Exness market data.
+- No Yahoo Finance.
+- No TradingView.
+- No Alpha Vantage.
+- No fake/demo/mock market data.
+- Read existing code before changing anything.
+- Preserve existing working functionality.
+- Do not change public interfaces unnecessarily.
+
+SECTION 3 implementation scope:
+
+1. Complete MT5/Exness market-data handling:
+   - Real tick data: bid, ask, spread, timestamp
+   - Real OHLCV data
+   - Historical candles
+   - M1, M5, M15, M30, H1, H4, D1
+   - 10 existing Forex pairs
+
+2. Implement proper data validation:
+   - Reject missing/invalid OHLC fields
+   - Reject zero/negative prices
+   - Validate high >= open/close
+   - Validate low <= open/close
+   - Validate timestamp
+   - Detect duplicate candles
+   - Detect abnormal/missing candle gaps where appropriate
+   - Reject corrupted records
+   - Keep validation deterministic and safe
+
+3. Implement connection monitoring:
+   - Detect MT5 disconnection/errors during runtime
+   - Log connection failures
+   - Attempt reconnect with bounded retries/backoff
+   - Do not create infinite retry loops
+   - Keep the service usable after temporary MT5 disconnects
+
+4. Implement live market-data update infrastructure:
+   - Continuously monitor configured pairs/timeframes
+   - Detect new candles
+   - Detect price/tick updates
+   - Avoid duplicate processing of the same candle
+   - Use async-safe scheduling/background execution
+   - Do not block the FastAPI event loop
+   - Use the existing APScheduler dependency if appropriate
+   - Do NOT create a second competing scheduler if one already exists
+
+5. Keep MarketDataService as the single source of truth for market data.
+   Downstream modules should consume its data rather than independently connecting to MT5.
+
+6. Preserve the existing MarketScanner behavior:
+   - 10 Forex pairs
+   - 7 timeframes
+   - asyncio concurrency
+   - Existing scan endpoints
+   - Existing OHLCV format
+
+7. Standardize market-data records where practical so downstream modules can identify:
+   - symbol/pair
+   - timeframe
+   - OHLC
+   - volume
+   - timestamp
+
+8. Fix misleading market-data configuration/documentation:
+   - Remove/replace stale MARKET_DATA_PROVIDER=yfinance references if they are not used.
+   - Do not introduce another market-data provider.
+
+9. MT5 dependency:
+   - Verify how the project currently handles the MetaTrader5 Python package.
+   - Do not invent a fake Linux fallback.
+   - Keep the real MT5/Exness path authoritative.
+   - If Windows is required for the real connector, document that clearly rather than silently substituting fake data.
+
+10. IMPORTANT SCOPE RULE:
+   Do NOT wire the AI Engine into the scanner in this task.
+   Do NOT redesign SMC.
+   Do NOT implement signal persistence.
+   Do NOT implement Risk Manager.
+   Do NOT implement trading/execution.
+   Those belong to later sections.
+
+11. Before changing files:
+   - Read all relevant existing files.
+   - Identify the minimum files that need modification.
+   - Preserve existing interfaces unless a change is genuinely required.
+   - Avoid unnecessary refactoring.
+
+12. After implementation run verification:
+   - py_compile
+   - pyflakes/lint if available
+   - import checks
+   - validation tests
+   - reconnect/error-path tests
+   - scheduler/live-update tests where practical
+   - verify 10 pairs
+   - verify 7 timeframes
+   - verify no fake/external market-data provider
+   - verify Sections 1, 2, SMC, and AI Engine were not unintentionally modified
+
+At the end provide an implementation report containing:
+- exact files changed
+- what was implemented
+- verification results
+- any remaining limitations
+- exact Section 3 completion percentage
+
+Do NOT proceed to the next section after this.
+Stop and wait for approval.

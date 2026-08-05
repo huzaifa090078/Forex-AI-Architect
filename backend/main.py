@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.router import api_router
 from app.core.config import settings
 from app.core.database import engine, Base
+from app.modules.market_scanner.live_feed import market_data_feed
 
 # ---------------------------------------------------------------------------
 # Application factory
@@ -49,8 +50,17 @@ def create_app() -> FastAPI:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
+        # Start the Section 3 live market-data feed (tick polling + candle
+        # detection).  The feed connects to MT5/Exness on first data request;
+        # on non-Windows platforms the connector raises RuntimeError which the
+        # feed catches and logs as a warning, so startup is never blocked.
+        await market_data_feed.start()
+
     @app.on_event("shutdown")
     async def on_shutdown() -> None:
+        # Stop the live feed before the event loop closes so background tasks
+        # can finish cleanly without CancelledError noise in the logs.
+        await market_data_feed.stop()
         await engine.dispose()
 
     return app

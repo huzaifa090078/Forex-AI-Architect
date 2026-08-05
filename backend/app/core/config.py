@@ -63,6 +63,10 @@ class Settings(BaseSettings):
     MT5_PASSWORD: str = Field(default="")
     MT5_SERVER: str = Field(default="")
     MT5_TERMINAL_PATH: str = Field(default="")
+    # Maximum number of reconnect attempts after a mid-session MT5 disconnect.
+    MT5_RECONNECT_ATTEMPTS: int = Field(default=5)
+    # Base delay (seconds) for the first reconnect attempt; doubles each retry.
+    MT5_RECONNECT_DELAY_SECONDS: float = Field(default=2.0)
 
     # ── AI Engine ────────────────────────────────────────────────────────────
     AI_MODEL_PATH: str = Field(default="./models")
@@ -71,6 +75,8 @@ class Settings(BaseSettings):
 
     # ── Market Data ──────────────────────────────────────────────────────────
     MARKET_SCAN_INTERVAL_SECONDS: int = Field(default=60)
+    # How often (seconds) the live feed polls tick data for all pairs.
+    MARKET_TICK_INTERVAL_SECONDS: int = Field(default=5)
 
     # ── News Filter ──────────────────────────────────────────────────────────
     NEWS_API_KEY: str = Field(default="")
