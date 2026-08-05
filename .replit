@@ -1,4 +1,4 @@
-modules = ["nodejs-20", "python-3.12", "web"]
+modules = ["nodejs-20", "python-3.12", "web", "postgresql-16"]
 
 [deployment]
 router = "application"
@@ -21,3 +21,27 @@ timeoutMs = 20000
 
 [nix]
 channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+AI_INFERENCE_DEVICE = "cpu"
+AI_MIN_CONFIDENCE = "0.75"
+AI_MODEL_PATH = "./models"
+ALLOWED_ORIGINS = "[\"*\"]"
+APP_DEBUG = "false"
+APP_ENV = "development"
+APP_HOST = "0.0.0.0"
+APP_PORT = "8000"
+BACKTEST_WORKERS = "4"
+DEFAULT_LOT_SIZE = "0.01"
+LOG_FILE = "./logs/forex_bot.log"
+LOG_FORMAT = "json"
+LOG_LEVEL = "INFO"
+MARKET_DATA_PROVIDER = "yfinance"
+MARKET_SCAN_INTERVAL_SECONDS = "60"
+MAX_DAILY_LOSS_PERCENT = "5.0"
+MAX_OPEN_TRADES = "5"
+NEWS_FILTER_ENABLED = "true"
+NEWS_HIGH_IMPACT_BLOCK_MINUTES = "30"
+RISK_PER_TRADE_PERCENT = "1.0"
