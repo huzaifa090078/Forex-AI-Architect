@@ -1,0 +1,206 @@
+SECTION 3 — MARKET DATA ENGINE
+READ-ONLY ANALYSIS ONLY
+
+Do NOT modify any files.
+Do NOT create any files.
+Do NOT implement anything.
+Do NOT make fixes.
+Do NOT touch Section 2.
+Do NOT touch SMC or AI Engine.
+
+We are now auditing SECTION 3 — Market Data Engine against the official specification.
+
+First, inspect all existing code, documentation, configuration, tests, and related modules relevant ONLY to the Market Data Engine.
+
+Official Section 3 requirements:
+
+3.1 PURPOSE
+The Market Data Engine must:
+- Receive real market data from MT5/Exness
+- Convert it into a standard format
+- Provide market data to other modules
+- Perform NO trading analysis itself
+
+3.2 WORKFLOW
+
+MT5/Exness
+    ↓
+Market Data Engine
+    ├── Market Scanner
+    ├── Technical Indicators
+    ├── SMC Engine
+    ├── AI Engine
+    └── Dashboard
+
+3.3 FEATURES
+
+1. LIVE TICK DATA
+Must provide:
+- Bid
+- Ask
+- Spread
+- Time
+
+2. LIVE OHLC CANDLES
+Each candle must contain:
+- Open
+- High
+- Low
+- Close
+- Volume
+- Time
+
+3. MULTIPLE TIMEFRAMES
+Required:
+- M1
+- M5
+- M15
+- M30
+- H1
+- H4
+- D1
+
+4. MULTIPLE CURRENCY PAIRS
+Required:
+- EURUSD
+- GBPUSD
+- USDJPY
+- USDCHF
+- AUDUSD
+- USDCAD
+- NZDUSD
+- EURJPY
+- GBPJPY
+- EURGBP
+
+5. HISTORICAL DATA
+Must provide previous candles for:
+- EMA
+- RSI
+- MACD
+- ATR
+- BOS
+- Order Blocks
+- AI Analysis
+
+6. LIVE UPDATES
+Must continuously handle:
+- New candle detection
+- Tick updates
+- Price updates
+- Fresh data for downstream modules
+
+7. STANDARD DATA FORMAT
+All modules should receive a consistent structure containing:
+- Symbol
+- Timeframe
+- OHLC
+- Volume
+- Timestamp
+
+8. DATA VALIDATION
+Must detect/reject:
+- Missing candles
+- Invalid prices
+- Wrong timestamps
+- Duplicate candles
+- Corrupted data
+
+9. CONNECTION MONITORING
+If MT5 disconnects:
+- Detect disconnection
+- Attempt reconnect
+- Log errors
+- Provide a mechanism for dashboard notification
+
+10. PERFORMANCE
+Must support:
+- Fast operation
+- Async operation
+- Multiple pairs concurrently
+- Multiple timeframes concurrently
+
+3.4 DOWNSTREAM MODULES
+Verify that data can be provided to:
+- Market Scanner
+- Technical Indicators
+- SMC Engine
+- AI Engine
+- Dashboard
+
+3.5 IMPORTANT DATA-SOURCE RULE
+The Market Data Engine must use ONLY:
+- MT5 / Exness real market data
+
+It must NOT use:
+- Yahoo Finance
+- TradingView
+- Alpha Vantage
+- Fake data
+- Demo/mock market data
+
+IMPORTANT:
+The Market Data Engine must be the SINGLE SOURCE OF TRUTH for market data.
+
+ANALYSIS REQUIREMENTS
+
+For EVERY requirement above, report:
+
+- ✅ Already implemented
+- 🟡 Partially implemented
+- ❌ Missing
+- ⚠️ Dependency / blocker, if any
+
+Also identify:
+
+1. Whether the current implementation actually connects to real MT5/Exness data.
+2. Whether the current implementation can receive real-time tick data.
+3. Whether the current implementation can receive real-time OHLCV candles.
+4. Whether historical data works.
+5. Whether all 10 required pairs are supported.
+6. Whether all 7 required timeframes are supported.
+7. Whether validation is actually implemented or only planned.
+8. Whether reconnect handling is actually implemented.
+9. Whether async concurrent data retrieval is actually implemented.
+10. Whether any fake/demo/external market-data source exists.
+11. How the Market Data Engine currently connects to downstream modules.
+
+EXACT FILE ANALYSIS
+
+List the exact files that are:
+- Already implementing Section 3
+- Partially implementing Section 3
+- Missing functionality
+- Would need modification if we later approve implementation
+
+Do NOT suggest changes outside Section 3.
+
+Do NOT implement anything.
+
+Do NOT modify any files.
+
+Do NOT modify:
+- Section 2
+- SMC module
+- AI Engine
+- TradeManager
+- Pending orders
+- Trading execution
+
+At the end, provide:
+
+SECTION 3 — MARKET DATA ENGINE
+READ-ONLY COMPLIANCE REPORT
+
+Include:
+- Overall completion percentage
+- Implemented requirements
+- Partial requirements
+- Missing requirements
+- Blockers/dependencies
+- Exact files that would need changes
+- Whether real MT5/Exness data is currently available
+
+Then STOP.
+
+WAIT FOR MY APPROVAL BEFORE MAKING ANY CHANGES.
