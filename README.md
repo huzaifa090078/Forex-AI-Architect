@@ -99,7 +99,7 @@ A production-grade AI-driven Forex trading platform with a React dashboard, Pyth
 │       │   │
 │       │   ├── mt5_integration/  # MetaTrader 5 broker adapter
 │       │   │   ├── interfaces.py # IMT5Connector, AccountInfo, BrokerPosition
-│       │   │   └── base.py       # SimulatedMT5Connector + RealMT5Connector stub
+│       │   │   └── base.py       # RealMT5Connector — live MT5/Exness terminal only
 │       │   │
 │       │   ├── backtesting/      # Historical strategy simulation
 │       │   │   ├── interfaces.py # IBacktestEngine, IDataLoader, BacktestResult
@@ -174,7 +174,7 @@ Owns the full order lifecycle: **signal approved → broker order → database r
 Composes Risk Manager (validation) and MT5 Integration (broker comms). Handles position reconciliation between local DB and live broker state.
 
 ### MT5 / Exness Integration (`app/modules/mt5_integration/`)
-The **only** module that speaks to MetaTrader 5. Provides `SimulatedMT5Connector` (always-on dev stub) and `RealMT5Connector` (Windows/Wine + MT5 terminal required). Abstracts: connect, account info, positions, orders, market execution, modification, OHLCV history.
+The **only** module that speaks to MetaTrader 5. Implements `RealMT5Connector` — the sole permitted connector — against a live MT5/Exness terminal. No simulated or demo connector is used. Abstracts: connect, account info, positions, orders, market execution, modification, OHLCV history.
 
 ### Backtesting Engine (`app/modules/backtesting/`)
 Replays historical OHLCV data through the full signal pipeline in a controlled simulation. Runs in a worker pool for parallelism. Computes: win rate, profit factor, max drawdown, Sharpe ratio, equity curve.
@@ -266,7 +266,7 @@ pnpm --filter @workspace/api-spec run codegen
 1. **Auth service** — implement `auth.login` / `auth.register` / `get_current_user` dependency
 2. **Database layer** — run Alembic migrations, verify all 7 tables
 3. **Settings service** — basic CRUD; unblocks all other services that read risk params
-4. **MT5 connector** — swap `SimulatedMT5Connector` for `RealMT5Connector` on Windows
+4. **MT5 connector** — implement `RealMT5Connector` against a live MT5/Exness terminal
 5. **Indicators module** — implement each `IIndicator.compute()` using TA-Lib or pandas
 6. **SMC module** — implement each `ISMCAnalyzer` detection method
 7. **AI Engine** — implement feature extractor + model inference (start with simple rules, add ML later)
@@ -281,9 +281,8 @@ pnpm --filter @workspace/api-spec run codegen
 
 ## Architecture Decisions
 
-- **Interface-first design** — every module exposes an ABC (`IXxx`) so implementations can be swapped (e.g. `SimulatedMT5Connector` → `RealMT5Connector`, sklearn → PyTorch) without touching callers.
+- **Interface-first design** — every module exposes an ABC (`IXxx`) so implementations can be swapped (e.g. sklearn → PyTorch) without touching callers.
 - **Separation of Python and Node.js** — Python FastAPI is the production backend; the Node.js server provides dev stubs matching the OpenAPI spec so the frontend can be developed independently.
 - **OpenAPI as the single contract** — `lib/api-spec/openapi.yaml` is the source of truth. React hooks and Zod schemas are generated from it; never hand-written.
 - **Async throughout** — all Python route handlers and module methods are `async`, enabling high-concurrency operation during live market hours.
-- **SimulatedMT5Connector** — allows full development and testing without a live MT5 terminal (which requires Windows). Swap to `RealMT5Connector` on the production host.
 - **News Filter as a kill-switch** — injected at the Trade Manager level, not the AI Engine level, so it suppresses all trade execution regardless of signal source.
