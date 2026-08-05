@@ -123,3 +123,18 @@ class IMT5Connector(ABC):
     ) -> List[Dict[str, Any]]:
         """Fetch OHLCV bars from MT5 history."""
         ...
+
+    @abstractmethod
+    async def get_tick(self, symbol: str) -> Dict[str, Any]:
+        """
+        Fetch real-time tick data for `symbol` via mt5.symbol_info_tick().
+
+        Returns a dict with keys:
+            "bid"       — float    (best bid price)
+            "ask"       — float    (best ask price)
+            "spread"    — float    (ask − bid, in price units)
+            "last"      — float    (last trade price; 0.0 if unavailable)
+            "volume"    — int      (tick volume at last price)
+            "tick_time" — datetime (UTC timestamp of the tick)
+        """
+        ...

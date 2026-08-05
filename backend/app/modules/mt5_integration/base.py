@@ -485,3 +485,30 @@ class RealMT5Connector(IMT5Connector):
                 }
             )
         return result
+
+    async def get_tick(self, symbol: str) -> Dict[str, Any]:
+        """
+        Fetch real-time tick data via mt5.symbol_info_tick().
+
+        Returns bid, ask, spread (ask − bid), last trade price, tick volume,
+        and the UTC timestamp of the tick as reported by the MT5 terminal.
+        No OHLCV bars are used; this is a direct terminal query.
+        """
+        _require_mt5()
+
+        tick = await self._run(mt5.symbol_info_tick, symbol)
+        if tick is None:
+            error = await self._run(mt5.last_error)
+            raise RuntimeError(
+                f"mt5.symbol_info_tick('{symbol}') returned None: {error}. "
+                "The symbol may be unavailable or the terminal is disconnected."
+            )
+
+        return {
+            "bid":       float(tick.bid),
+            "ask":       float(tick.ask),
+            "spread":    float(tick.ask - tick.bid),
+            "last":      float(tick.last),
+            "volume":    int(tick.volume),
+            "tick_time": datetime.fromtimestamp(tick.time, tz=timezone.utc),
+        }

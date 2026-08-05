@@ -117,50 +117,42 @@ class MarketDataService(IMarketDataProvider):
 
     async def get_tick(self, pair: str) -> Dict[str, Any]:
         """
-        Derive current tick data from MT5 H1 OHLCV bars.
+        Fetch real-time tick data from MT5 via IMT5Connector.get_tick().
 
-        Since IMT5Connector exposes no dedicated tick endpoint, tick values
-        are derived as follows:
-          - price (bid)  — close of the most recent H1 bar
-          - ask          — bid + spread
-          - spread       — from bar's 'spread' field if present, else 2-pip estimate
-          - change_24h   — (last_close − close_24h_ago) / close_24h_ago × 100
+        bid/ask/spread/last/tick_time come directly from mt5.symbol_info_tick()
+        (no OHLCV derivation).  24h price change is computed from H1 bars
+        fetched concurrently alongside the tick query.
 
         Raises:
-            RuntimeError — MT5 returned no data for this pair.
+            RuntimeError — connector refused connection or MT5 returned no data.
         """
         await self._ensure_connected()
 
-        # 26 H1 bars: bar[-1] = current, bar[-25] = ~24 hours ago
+        # Fetch real tick and H1 bars concurrently.
+        # tick_data → real-time bid/ask/spread from mt5.symbol_info_tick()
+        # bars      → 24h change calculation only (26 bars = ~25h window)
         mt5_tf = _MT5_TIMEFRAMES["H1"]
-        bars = await self._connector.get_ohlcv(pair, mt5_tf, 26)
+        tick_data, bars = await asyncio.gather(
+            self._connector.get_tick(pair),
+            self._connector.get_ohlcv(pair, mt5_tf, 26),
+        )
 
-        if not bars:
-            raise RuntimeError(
-                f"MT5 returned no data for {pair} — cannot derive tick."
-            )
+        bid = tick_data["bid"]
 
-        price = _close(bars[-1])
-
-        # 24h change
+        # 24h change: compare current bid against close ~24 H1 bars ago
         if len(bars) >= 25:
             prev = _close(bars[-25])
-            change_pct = ((price - prev) / prev * 100.0) if prev > 0.0 else 0.0
+            change_pct = ((bid - prev) / prev * 100.0) if prev > 0.0 else 0.0
         else:
             change_pct = 0.0
 
-        # Spread: use bar value if the connector populates it, else estimate
-        raw_spread = bars[-1].get("spread")
-        if raw_spread is not None and float(raw_spread) > 0.0:
-            spread = float(raw_spread)
-        else:
-            spread = _pip(pair) * 2  # 2-pip fallback
-
         return {
             "pair":       pair,
-            "bid":        price,
-            "ask":        price + spread,
-            "spread":     spread,
+            "bid":        bid,
+            "ask":        tick_data["ask"],
+            "spread":     tick_data["spread"],
+            "last":       tick_data["last"],
+            "tick_time":  tick_data["tick_time"],
             "change_24h": change_pct,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
