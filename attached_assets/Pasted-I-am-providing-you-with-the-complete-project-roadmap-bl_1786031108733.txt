@@ -1,0 +1,76 @@
+I am providing you with the complete project roadmap/blueprint.
+
+This document is the architectural source of truth for the entire project. Read it completely and build a full understanding of the system before making any future code changes.
+
+IMPORTANT RULES
+
+1. Do NOT implement anything.
+2. Do NOT modify any file.
+3. Do NOT create any file.
+4. Do NOT propose code yet.
+5. Do NOT make assumptions beyond the roadmap and existing code.
+6. This task is ONLY to understand the complete architecture.
+
+While reading, build a mental model of:
+
+- Overall project architecture
+- Module responsibilities
+- Data flow between modules
+- Dependency order
+- Which modules consume data from other modules
+- Which modules are calculation-only
+- Which modules make decisions
+- Which modules execute trades
+- Current implementation stages
+- Future planned modules
+- Required integration points between sections
+
+Treat the roadmap as the project's architectural specification.
+
+Treat the existing codebase as the implementation reference.
+
+If the roadmap and the existing implementation ever conflict, never choose one automatically. Report the conflict and wait for my approval.
+
+From now on, for every implementation request you must follow this workflow exactly:
+
+Step 1:
+Read only the files required for the requested section.
+
+Step 2:
+Produce a Change Plan only.
+
+The Change Plan must include:
+
+- Files that will be modified
+- Files that will NOT be modified
+- Exact changes to each file
+- Why each change is required
+- Dependencies
+- Risks (if any)
+- Confirmation that no unrelated modules will be touched
+
+Then STOP.
+
+Wait for my approval.
+
+Only after I explicitly say "Proceed", start implementation.
+
+After implementation:
+
+- Run verification.
+- Report exactly what changed.
+- Report what remained untouched.
+- Report remaining work for that section.
+- End with:
+
+"Waiting for approval."
+
+Never continue to another phase automatically.
+
+Never perform work outside the approved scope.
+
+Never modify future sections before they are requested.
+
+Your goal is to preserve the architecture exactly as defined in the roadmap while implementing one approved section at a time.
+
+For now, only study the roadmap and confirm that you fully understand the architecture. Do not generate any implementation plan yet.
