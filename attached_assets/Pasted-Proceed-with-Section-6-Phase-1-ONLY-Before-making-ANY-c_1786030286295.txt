@@ -1,0 +1,74 @@
+Proceed with Section 6 — Phase 1 ONLY.
+
+Before making ANY code changes:
+
+1. Read only the minimum files required.
+2. Show a short Change Plan including:
+   - Files that will be modified.
+   - Exact features that will be implemented.
+   - Confirmation that NO scanner, AI Engine, Dashboard, API, Risk Manager or other consumer modules will be modified.
+3. Do not write any code until the plan is complete.
+
+Implementation scope (ONLY Phase 1):
+
+Complete the remaining core SMC engine functionality:
+
+1. Package Exports
+- Complete backend/app/modules/smc/__init__.py
+- Export the public SMC API (SMCAnalyzer, SMCStructure, SMCPattern, Zone and other existing public types/functions as appropriate).
+- Do not change existing implementations.
+
+2. Supply & Demand Detection
+Implement native Supply Zone and Demand Zone detection inside the SMC engine.
+
+Requirements:
+- Use existing OHLCV data only.
+- Follow the current architecture:
+  calculations.py -> pure calculation
+  analyzer.py -> conversion to SMCStructure
+- Do not duplicate existing Order Block logic.
+- Supply/Demand must be an independent detection algorithm.
+- Extend interfaces only where required.
+- Preserve backward compatibility.
+
+3. Mitigation Completion
+Complete mitigation support inside the SMC engine.
+
+Requirements:
+- Finish the existing mitigation implementation.
+- Populate MITIGATION_BLOCK where appropriate if already defined in the architecture.
+- Reuse existing mitigation logic wherever possible.
+- Do NOT introduce any background/live monitoring.
+- Only complete the static analysis performed on the supplied OHLCV window.
+
+Do NOT implement:
+
+- Multi-Timeframe analysis
+- Confluence detection
+- Scanner integration
+- API routes
+- Dashboard output
+- AI integration
+- Risk Manager integration
+- Live monitoring
+
+After implementation run ONLY:
+
+- py_compile
+- pyflakes
+
+Then provide:
+
+1. Files changed
+2. Exact features implemented
+3. Confirmation that existing algorithms were preserved where applicable
+4. Verification results
+5. Remaining Section 6 work only
+
+Stop after Phase 1.
+
+Do NOT continue automatically.
+
+End with exactly:
+
+"Phase 1 complete. Waiting for approval before continuing to Phase 2."

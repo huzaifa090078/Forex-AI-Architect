@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 
 class SMCPattern(str, Enum):
@@ -23,6 +23,8 @@ class SMCPattern(str, Enum):
     LIQUIDITY_SWEEP = "liquidity_sweep"
     MITIGATION_BLOCK = "mitigation_block"
     INDUCEMENT = "inducement"
+    SUPPLY_ZONE = "supply_zone"
+    DEMAND_ZONE = "demand_zone"
 
 
 class Zone(str, Enum):
@@ -81,4 +83,17 @@ class ISMCAnalyzer(ABC):
     @abstractmethod
     def classify_price_zone(self, pair: str, current_price: float) -> Zone:
         """Return whether price is in a Premium, Equilibrium, or Discount zone."""
+        ...
+
+    @abstractmethod
+    def detect_supply_demand(
+        self, ohlcv: List[Dict[str, Any]], timeframe: str
+    ) -> List[SMCStructure]:
+        """
+        Detect Supply and Demand zones from consolidation bases.
+
+        Supply Zone — base area preceding a strong bearish impulse.
+        Demand Zone — base area preceding a strong bullish impulse.
+        Mitigated zones are returned as MITIGATION_BLOCK.
+        """
         ...

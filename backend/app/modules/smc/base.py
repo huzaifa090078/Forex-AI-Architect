@@ -45,3 +45,8 @@ class BaseSMCAnalyzer(ISMCAnalyzer):
 
     def classify_price_zone(self, pair: str, current_price: float) -> Zone:
         raise NotImplementedError("Implement premium / discount zone classification")
+
+    def detect_supply_demand(
+        self, ohlcv: List[Dict[str, Any]], timeframe: str
+    ) -> List[SMCStructure]:
+        raise NotImplementedError("Implement supply and demand zone detection")

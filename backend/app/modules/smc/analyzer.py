@@ -39,6 +39,7 @@ from app.modules.smc.calculations import (
     calc_fair_value_gaps,
     calc_liquidity_levels,
     calc_price_zone,
+    calc_supply_demand,
 )
 
 logger = logging.getLogger(__name__)
@@ -425,3 +426,80 @@ class SMCAnalyzer(BaseSMCAnalyzer):
             "classify_price_zone(%s, %.5f): %s", pair, current_price, zone.value
         )
         return zone
+
+    # ── ISMCAnalyzer — detect_supply_demand ───────────────────────────────────
+
+    def detect_supply_demand(
+        self,
+        ohlcv:     List[Dict[str, Any]],
+        timeframe: str,
+    ) -> List[SMCStructure]:
+        """
+        Detect Supply Zones, Demand Zones, and mitigated zones (Mitigation Blocks).
+
+        Algorithm (independent from Order Blocks — see calc_supply_demand docstring):
+          1. Identify consolidation bases: runs of ≥2 bars with body ≤ 0.5 × ATR.
+          2. Confirm a directional impulse ≥ 1.5 × ATR after the base.
+          3. Zone bounds = [min(lows), max(highs)] of the base bars.
+          4. Classify:
+               Unmitigated Demand Zone → SMCPattern.DEMAND_ZONE,  validated=True
+               Unmitigated Supply Zone → SMCPattern.SUPPLY_ZONE,  validated=True
+               Mitigated zone          → SMCPattern.MITIGATION_BLOCK, validated=False
+
+        Pattern population:
+          SMCPattern.DEMAND_ZONE       — active bullish accumulation zone
+          SMCPattern.SUPPLY_ZONE       — active bearish distribution zone
+          SMCPattern.MITIGATION_BLOCK  — zone that has been revisited by price;
+                                         may still act as a reference level but
+                                         is no longer a fresh untested zone
+
+        Returns [] on data errors or insufficient bars (logged at WARNING).
+        pair = "" — caller enriches when wiring into MarketScanner.
+        """
+        try:
+            opens, highs, lows, closes, _ = extract_arrays(ohlcv)
+        except (ValueError, KeyError) as exc:
+            logger.error("detect_supply_demand: data extraction failed — %s", exc)
+            return []
+
+        try:
+            raw = calc_supply_demand(opens, highs, lows, closes)
+        except ValueError as exc:
+            logger.warning("detect_supply_demand: insufficient data — %s", exc)
+            return []
+
+        _pattern_map = {
+            "demand_zone":      SMCPattern.DEMAND_ZONE,
+            "supply_zone":      SMCPattern.SUPPLY_ZONE,
+            "mitigation_block": SMCPattern.MITIGATION_BLOCK,
+        }
+
+        structures: List[SMCStructure] = []
+        for r in raw:
+            mid_level = (r["zone_low"] + r["zone_high"]) / 2.0
+            zone      = self._zone_for_level(mid_level, highs, lows)
+            pattern   = _pattern_map[r["pattern"]]
+            validated = not r["mitigated"]   # active (untested) zone = validated
+
+            structures.append(SMCStructure(
+                pattern=pattern,
+                pair=_PAIR_UNSET,
+                timeframe=timeframe,
+                zone=zone,
+                price_low=r["zone_low"],
+                price_high=r["zone_high"],
+                direction=r["direction"],
+                strength=r["strength"],
+                validated=validated,
+                metadata={
+                    "zone_start": r["zone_start"],
+                    "zone_end":   r["zone_end"],
+                    "mitigated":  r["mitigated"],
+                },
+            ))
+
+        logger.debug(
+            "detect_supply_demand(%s): %d structures detected",
+            timeframe, len(structures),
+        )
+        return structures

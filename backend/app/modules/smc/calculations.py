@@ -412,6 +412,169 @@ def calc_order_blocks(
     return results
 
 
+# ── Supply & Demand Zones ─────────────────────────────────────────────────────
+
+def calc_supply_demand(
+    opens:            np.ndarray,
+    highs:            np.ndarray,
+    lows:             np.ndarray,
+    closes:           np.ndarray,
+    base_bars:        int   = 2,
+    base_body_pct:    float = 0.5,
+    impulse_bars:     int   = 3,
+    impulse_atr_mult: float = 1.5,
+) -> List[Dict[str, Any]]:
+    """
+    Detect Supply Zones and Demand Zones from consolidation-base patterns.
+
+    Conceptually distinct from Order Blocks:
+      Order Block — single opposing candle before a swing-confirmed impulse.
+      Supply/Demand — multi-bar consolidation base (tight range) before any
+                      strong directional impulse, regardless of swing status.
+
+    Detection algorithm:
+      1. Compute ATR for the window (mean true range).
+      2. Walk bars sequentially. At each position, test whether a run of
+         `base_bars` consecutive bars qualifies as a consolidation base:
+           body_size = |close - open| ≤ base_body_pct × ATR  (for every bar).
+      3. Immediately after the base, measure the net directional move over the
+         next `impulse_bars` bars:
+           net_move = close[base_end + impulse_bars] − close[base_end]
+         If |net_move| ≥ impulse_atr_mult × ATR:
+           net_move > 0  → Demand Zone (bullish)
+           net_move < 0  → Supply  Zone (bearish)
+      4. Zone bounds:
+           zone_low  = min(lows  of base bars)
+           zone_high = max(highs of base bars)
+      5. Deduplication:
+           Once a base is consumed (matched), advance past its last bar so
+           overlapping bases do not produce redundant zones.
+      6. Mitigation check (static, same-window):
+           Scan all bars after the impulse.
+           Demand Zone mitigated: high[j] ≥ zone_low AND close[j] ≥ zone_low
+             (price returned into the zone from above).
+           Supply Zone mitigated: low[j]  ≤ zone_high AND close[j] ≤ zone_high
+             (price returned into the zone from below).
+           A mitigated zone pattern becomes 'mitigation_block'.
+
+    Strength:
+      |net_move| / (impulse_atr_mult × ATR × impulse_bars), clamped [0.30, 1.0].
+
+    Returns:
+        List of dicts:
+          'zone_start' — int   : first bar index of the consolidation base
+          'zone_end'   — int   : last bar index of the consolidation base
+          'pattern'    — str   : 'supply_zone' | 'demand_zone' | 'mitigation_block'
+          'direction'  — str   : 'bullish' (demand) | 'bearish' (supply)
+          'zone_low'   — float : min(lows of base bars)
+          'zone_high'  — float : max(highs of base bars)
+          'mitigated'  — bool  : True if price traded back into the zone
+          'strength'   — float : 0.30 – 1.0
+
+    Raises:
+        ValueError — fewer than base_bars + impulse_bars + 1 bars supplied.
+    """
+    n = len(closes)
+    min_bars = base_bars + impulse_bars + 1
+    if n < min_bars:
+        raise ValueError(
+            f"calc_supply_demand requires at least {min_bars} bars; got {n}."
+        )
+    if len(opens) != n or len(highs) != n or len(lows) != n:
+        raise ValueError("opens, highs, lows, closes must all have the same length.")
+
+    # Mean ATR for body-size threshold and impulse comparison
+    if n >= 2:
+        tr  = np.maximum(
+            highs[1:] - lows[1:],
+            np.maximum(
+                np.abs(highs[1:] - closes[:-1]),
+                np.abs(lows[1:]  - closes[:-1]),
+            ),
+        )
+        atr = float(np.mean(tr))
+    else:
+        atr = 1.0
+    if atr <= 0.0:
+        atr = 1.0
+
+    body_threshold    = base_body_pct * atr
+    impulse_threshold = impulse_atr_mult * atr
+    strength_denom    = impulse_atr_mult * atr * impulse_bars
+
+    results: List[Dict[str, Any]] = []
+    i = 0
+
+    while i <= n - base_bars - impulse_bars:
+        # ── Test consolidation base starting at i ─────────────────────────────
+        base_valid = True
+        for k in range(i, i + base_bars):
+            body = abs(float(closes[k]) - float(opens[k]))
+            if body > body_threshold:
+                base_valid = False
+                break
+
+        if not base_valid:
+            i += 1
+            continue
+
+        base_start = i
+        base_end   = i + base_bars - 1
+        impulse_end = base_end + impulse_bars
+
+        if impulse_end >= n:
+            i += 1
+            continue
+
+        # ── Measure impulse immediately after the base ─────────────────────
+        net_move = float(closes[impulse_end]) - float(closes[base_end])
+
+        if abs(net_move) < impulse_threshold:
+            i += 1
+            continue
+
+        # ── Valid zone found ───────────────────────────────────────────────
+        zone_low  = float(np.min(lows[base_start : base_end + 1]))
+        zone_high = float(np.max(highs[base_start : base_end + 1]))
+
+        direction = "bullish" if net_move > 0 else "bearish"
+        raw_pattern = "demand_zone" if direction == "bullish" else "supply_zone"
+
+        strength = float(np.clip(abs(net_move) / strength_denom, 0.30, 1.0))
+
+        # ── Mitigation check (static, scan forward from impulse_end) ──────
+        mitigated = False
+        for j in range(impulse_end + 1, n):
+            if direction == "bullish":
+                # Demand zone: price returns into zone from below
+                if float(highs[j]) >= zone_low and float(closes[j]) >= zone_low:
+                    mitigated = True
+                    break
+            else:
+                # Supply zone: price returns into zone from above
+                if float(lows[j]) <= zone_high and float(closes[j]) <= zone_high:
+                    mitigated = True
+                    break
+
+        pattern = "mitigation_block" if mitigated else raw_pattern
+
+        results.append({
+            "zone_start": base_start,
+            "zone_end":   base_end,
+            "pattern":    pattern,
+            "direction":  direction,
+            "zone_low":   round(zone_low,  6),
+            "zone_high":  round(zone_high, 6),
+            "mitigated":  mitigated,
+            "strength":   round(strength,  4),
+        })
+
+        # Advance past the consumed base to avoid overlapping zones
+        i = base_end + 1
+
+    return results
+
+
 # ── Fair Value Gaps ───────────────────────────────────────────────────────────
 
 def calc_fair_value_gaps(
