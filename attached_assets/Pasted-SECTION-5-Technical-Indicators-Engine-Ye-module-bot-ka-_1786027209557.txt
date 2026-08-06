@@ -1,0 +1,188 @@
+SECTION 5 — Technical Indicators Engine
+Ye module bot ka mathematical analysis engine hai.
+Is ka kaam sirf indicators calculate karna hai.
+Ye:
+•	❌ Trade nahi lega. 
+•	❌ Buy/Sell signal nahi banayega. 
+•	❌ Risk calculate nahi karega. 
+Sirf calculations karega aur result dusre modules ko dega.
+________________________________________
+5.1 Purpose
+Technical Indicators Engine:
+•	Market Data Engine se candles lega. 
+•	Indicators calculate karega. 
+•	Results AI aur SMC ko bhejega. 
+________________________________________
+5.2 Workflow
+Market Data Engine
+        │
+        ▼
+Technical Indicators
+        │
+        ├──► AI Engine
+        ├──► SMC Engine
+        └──► Dashboard
+________________________________________
+5.3 Indicators
+1. EMA (Exponential Moving Average)
+Purpose
+Trend identify karna.
+EMA Values
+•	EMA 20 
+•	EMA 50 
+•	EMA 100 
+•	EMA 200 
+Use
+•	Trend direction 
+•	Dynamic support/resistance 
+•	Trend confirmation 
+________________________________________
+2. SMA (Simple Moving Average)
+Purpose
+Long-term trend dekhna.
+SMA Values
+•	SMA 20 
+•	SMA 50 
+•	SMA 100 
+•	SMA 200 
+Use
+•	Trend confirmation 
+•	Market direction 
+________________________________________
+3. RSI (Relative Strength Index)
+Purpose
+Overbought aur Oversold market identify karna.
+Range
+•	0 – 100 
+Important Levels
+•	Above 70 → Overbought 
+•	Below 30 → Oversold 
+•	Around 50 → Neutral 
+Use
+•	Momentum 
+•	Reversal confirmation 
+________________________________________
+4. MACD
+Purpose
+Momentum aur trend strength.
+Components
+•	MACD Line 
+•	Signal Line 
+•	Histogram 
+Use
+•	Momentum change 
+•	Trend confirmation 
+•	Crossovers 
+________________________________________
+5. ATR (Average True Range)
+Purpose
+Market volatility measure karna.
+Use
+•	SL calculation 
+•	TP calculation 
+•	Market volatility 
+________________________________________
+6. Bollinger Bands
+Components
+•	Upper Band 
+•	Middle Band 
+•	Lower Band 
+Use
+•	Volatility 
+•	Range detection 
+•	Breakout detection 
+________________________________________
+7. VWAP (Volume Weighted Average Price)
+Purpose
+Institutional average price.
+Use
+•	Trend bias 
+•	Fair value 
+•	Institutional confirmation 
+________________________________________
+8. ADX (Average Directional Index)
+Purpose
+Trend ki strength measure karna.
+Components
+•	ADX 
+•	+DI 
+•	-DI 
+Levels
+•	Below 20 → Weak Trend 
+•	20–25 → Developing Trend 
+•	Above 25 → Strong Trend 
+________________________________________
+9. Stochastic RSI
+Purpose
+Fast momentum indicator.
+Components
+•	%K 
+•	%D 
+Use
+•	Early reversal 
+•	Momentum confirmation 
+________________________________________
+10. Volume Analysis
+Engine Check Karega
+•	Current Volume 
+•	Average Volume 
+•	Volume Spike 
+•	Volume Drop 
+•	OBV (On Balance Volume) 
+Use
+•	Breakout confirmation 
+•	Institutional activity 
+________________________________________
+5.4 Indicator Output
+Har indicator standard format return karega.
+Example:
+•	Indicator Name 
+•	Current Value 
+•	Signal 
+•	Status 
+•	Timestamp 
+Is se AI aur Dashboard dono easily use kar sakenge.
+________________________________________
+5.5 Rules
+Indicators Engine:
+•	✅ Sirf calculations karega. 
+•	✅ Koi decision nahi lega. 
+•	✅ Koi trade execute nahi karega. 
+•	✅ Koi risk calculate nahi karega. 
+________________________________________
+5.6 Data Consumers
+Ye results use karenge:
+•	AI Engine 
+•	SMC Engine 
+•	Dashboard 
+•	Trade Logs 
+•	Analytics 
+________________________________________
+5.7 Performance
+•	Async processing 
+•	Reusable calculations 
+•	No duplicate calculations 
+•	Ek hi calculation sab modules reuse karenge 
+________________________________________
+5.8 Future Expansion
+Future mein agar zarurat hui to add kar sakte hain:
+•	Ichimoku Cloud 
+•	CCI 
+•	Keltner Channels 
+•	Pivot Points 
+•	SuperTrend 
+Ye core version ka hissa nahi honge jab tak un ki practical zarurat prove na ho.
+________________________________________
+Technical Indicators Summary
+Is module ki zimmedari:
+•	✅ EMA 
+•	✅ SMA 
+•	✅ RSI 
+•	✅ MACD 
+•	✅ ATR 
+•	✅ Bollinger Bands 
+•	✅ VWAP 
+•	✅ ADX 
+•	✅ Stochastic RSI 
+•	✅ Volume Analysis 
+Important: Ye module sirf calculate karta hai, decision AI aur SMC modules lenge.
