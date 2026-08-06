@@ -21,6 +21,7 @@ Callers that want to tolerate short data should catch ValueError themselves.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import numpy as np
@@ -87,6 +88,8 @@ class EMAIndicator(BaseIndicator):
         return IndicatorResult(
             name=self.name,
             value=_round(value),
+            status="active" if value is not None else "warmup",
+            timestamp=datetime.now(timezone.utc),
             signal=None,
             metadata={"period": self._period, "series_len": valid},
         )
@@ -117,6 +120,8 @@ class SMAIndicator(BaseIndicator):
         return IndicatorResult(
             name=self.name,
             value=_round(value),
+            status="active" if value is not None else "warmup",
+            timestamp=datetime.now(timezone.utc),
             signal=None,
             metadata={"period": self._period, "series_len": valid},
         )
@@ -175,6 +180,8 @@ class RSIIndicator(BaseIndicator):
         return IndicatorResult(
             name=self.name,
             value=_round(value, 2),
+            status="active" if value is not None else "warmup",
+            timestamp=datetime.now(timezone.utc),
             signal=signal,
             metadata={
                 "period":     self._period,
@@ -252,6 +259,8 @@ class MACDIndicator(BaseIndicator):
                 "signal":    _round(last_sig),
                 "histogram": _round(last_hist),
             },
+            status="active" if last_macd is not None else "warmup",
+            timestamp=datetime.now(timezone.utc),
             signal=direction,
             metadata={
                 "fast":          self._fast,
@@ -332,6 +341,8 @@ class StochasticRSIIndicator(BaseIndicator):
         return IndicatorResult(
             name=self.name,
             value={"k": _round(last_k, 2), "d": _round(last_d, 2)},
+            status="active" if last_k is not None else "warmup",
+            timestamp=datetime.now(timezone.utc),
             signal=signal,
             metadata={
                 "rsi_period":    self._rsi_period,
@@ -377,6 +388,8 @@ class ATRIndicator(BaseIndicator):
         return IndicatorResult(
             name=self.name,
             value=_round(value),
+            status="active" if value is not None else "warmup",
+            timestamp=datetime.now(timezone.utc),
             signal=None,
             metadata={
                 "period":  self._period,
@@ -453,6 +466,8 @@ class BollingerBandsIndicator(BaseIndicator):
                 "bandwidth": _round(bandwidth, 4),
                 "percent_b": _round(pct_b, 4),
             },
+            status="active" if upper is not None else "warmup",
+            timestamp=datetime.now(timezone.utc),
             signal=signal,
             metadata={
                 "period":  self._period,
@@ -510,6 +525,8 @@ class VWAPIndicator(BaseIndicator):
         return IndicatorResult(
             name=self.name,
             value=_round(value),
+            status="active" if value is not None else "warmup",
+            timestamp=datetime.now(timezone.utc),
             signal=signal,
             metadata={
                 "last_close":          _round(last_close),
@@ -578,6 +595,8 @@ class VolumeAnalysisIndicator(BaseIndicator):
                 "obv":       _round(last_obv, 2),
                 "vol_ratio": _round(last_ratio, 4),
             },
+            status="active" if last_obv is not None else "warmup",
+            timestamp=datetime.now(timezone.utc),
             signal=signal,
             metadata={
                 "period":      self._period,
@@ -633,6 +652,8 @@ class ADXIndicator(BaseIndicator):
                 "plus_di":  _round(plus_di, 2),
                 "minus_di": _round(minus_di, 2),
             },
+            status="active" if adx_val is not None else "warmup",
+            timestamp=datetime.now(timezone.utc),
             signal=None,
             metadata={
                 "period":       self._period,

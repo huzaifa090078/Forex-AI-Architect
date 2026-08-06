@@ -7,16 +7,33 @@ and return a result dict. This makes them trivially testable and composable.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 
 @dataclass
 class IndicatorResult:
-    """Uniform output wrapper for any indicator."""
-    name: str
-    value: Any                          # scalar, list, or dict depending on indicator
-    signal: Optional[str] = None       # "buy" | "sell" | "neutral" | None
-    metadata: Dict[str, Any] = None
+    """Uniform output wrapper for any indicator.
+
+    Fields
+    ------
+    name      : canonical indicator name (e.g. "EMA_20", "RSI_14")
+    value     : computed result — scalar float or dict of floats
+    status    : computation state —
+                  "active"    value is valid and the series is fully warmed up
+                  "warmup"    not enough bars yet; value is None
+                  "unavailable" computation failed (set externally by the suite)
+    timestamp : UTC datetime when compute() was called
+    signal    : optional directional hint ("buy" | "sell" | "neutral" | None)
+    metadata  : indicator-specific supplementary data
+    """
+
+    name:      str
+    value:     Any
+    status:    str                      # "active" | "warmup" | "unavailable"
+    timestamp: datetime                 # UTC calculation time
+    signal:    Optional[str] = None    # "buy" | "sell" | "neutral" | None
+    metadata:  Dict[str, Any] = None
 
     def __post_init__(self):
         if self.metadata is None:
