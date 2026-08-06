@@ -5,6 +5,10 @@ Scans 10 configured forex pairs across 5 timeframes using MarketDataService
 (MT5/Exness).  Computes structural indicators (EMA trend, RSI momentum, ATR
 volatility) to rank and describe market conditions.
 
+Indicators are computed via IndicatorSuite (build_default_suite) — the single
+authoritative source for all technical calculations in this project.  No
+duplicate indicator logic exists in this module.
+
 No trading logic.  No AI analysis.  No mock data.
 """
 
@@ -12,11 +16,16 @@ import asyncio
 import logging
 from typing import List, Optional
 
-import numpy as np
-
 from app.modules.market_scanner.base import BaseMarketScanner
 from app.modules.market_scanner.interfaces import ScanResult
 from app.modules.market_scanner.market_data_service import MarketDataService
+from app.modules.indicators.suite import (
+    build_default_suite,
+    EMA_20,
+    EMA_50,
+    RSI_14,
+    ATR_14,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -29,8 +38,10 @@ FOREX_PAIRS: List[str] = [
 
 TIMEFRAMES: List[str] = ["M1", "M5", "M15", "M30", "H1", "H4", "D1"]
 
-# Minimum bars required before indicators are considered reliable
-_MIN_BARS = 20
+# Minimum bars required before indicators are considered reliable.
+# EMA_50 needs at least 50 bars to produce a valid value; 51 gives one
+# warm-up bar beyond the seed, matching calc_ema's minimum-bars contract.
+_MIN_BARS = 51
 
 # Bars fetched per scan — enough for EMA50 + RSI14 + ATR14 with headroom
 _OHLCV_COUNT = 60
@@ -38,45 +49,12 @@ _OHLCV_COUNT = 60
 # Minimum score a timeframe result must reach to be returned
 _SCORE_THRESHOLD = 0.6
 
+# Subset of indicators the scanner needs (avoids running all 13 unnecessarily)
+_SCANNER_INDICATORS = [EMA_20, EMA_50, RSI_14, ATR_14]
 
-# ── Indicator helpers ─────────────────────────────────────────────────────────
-
-def _ema(values: np.ndarray, period: int) -> np.ndarray:
-    """Exponential moving average over `values`."""
-    alpha = 2.0 / (period + 1.0)
-    out = np.empty_like(values, dtype=float)
-    out[0] = values[0]
-    for i in range(1, len(values)):
-        out[i] = alpha * values[i] + (1.0 - alpha) * out[i - 1]
-    return out
-
-
-def _rsi(closes: np.ndarray, period: int = 14) -> float:
-    """Simple RSI for the most recent bar (Wilder-smoothed not required here)."""
-    if len(closes) < period + 1:
-        return 50.0
-    deltas = np.diff(closes[-(period + 1):])
-    gains  = np.where(deltas > 0, deltas,  0.0)
-    losses = np.where(deltas < 0, -deltas, 0.0)
-    avg_gain = gains.mean()
-    avg_loss = losses.mean()
-    if avg_loss == 0.0:
-        return 100.0
-    return 100.0 - (100.0 / (1.0 + avg_gain / avg_loss))
-
-
-def _atr(highs: np.ndarray, lows: np.ndarray, closes: np.ndarray, period: int = 14) -> float:
-    """Average True Range over the last `period` bars."""
-    if len(closes) < 2:
-        return 0.0
-    tr = np.maximum(
-        highs[1:]  - lows[1:],
-        np.maximum(
-            np.abs(highs[1:]  - closes[:-1]),
-            np.abs(lows[1:]   - closes[:-1]),
-        ),
-    )
-    return float(tr[-period:].mean())
+# ── Shared IndicatorSuite ──────────────────────────────────────────────────────
+# Built once at module load.  compute_all() is stateless — sharing is safe.
+_indicator_suite = build_default_suite()
 
 
 # ── MarketScanner ─────────────────────────────────────────────────────────────
@@ -137,11 +115,11 @@ class MarketScanner(BaseMarketScanner):
 
         Steps:
           1. Fetch OHLCV via MarketDataService.
-          2. Compute EMA20, EMA50, RSI(14), ATR(14).
+          2. Compute EMA_20, EMA_50, RSI_14, ATR_14 via IndicatorSuite.
           3. Assess structural alignment (trend + momentum + volatility).
           4. Return ScanResult if score ≥ threshold, else None.
 
-        Returns None on data errors or insufficient bars.
+        Returns None on data errors, insufficient bars, or indicator failures.
         """
         try:
             bars = await self._provider.get_ohlcv(pair, timeframe, _OHLCV_COUNT)
@@ -159,21 +137,39 @@ class MarketScanner(BaseMarketScanner):
             )
             return None
 
-        closes = np.array([b["close"] for b in bars], dtype=float)
-        highs  = np.array([b["high"]  for b in bars], dtype=float)
-        lows   = np.array([b["low"]   for b in bars], dtype=float)
+        # ── Indicator computation via IndicatorSuite ──────────────────────
+        ind_results = _indicator_suite.compute_all(
+            bars, indicators=_SCANNER_INDICATORS
+        )
 
-        ema20 = _ema(closes, 20)
-        ema50 = _ema(closes, 50)
-        rsi   = _rsi(closes)
-        atr   = _atr(highs, lows, closes)
+        # Guard: if any required indicator failed (e.g. ValueError propagated
+        # from calc_* functions on short input), abort this timeframe cleanly.
+        missing = [k for k in _SCANNER_INDICATORS if k not in ind_results]
+        if missing:
+            logger.debug(
+                "MarketScanner: indicator(s) %s unavailable for %s/%s; skipping",
+                missing, pair, timeframe,
+            )
+            return None
 
-        price      = closes[-1]
-        ema20_last = ema20[-1]
-        ema50_last = ema50[-1]
+        ema20_last = ind_results[EMA_20].value
+        ema50_last = ind_results[EMA_50].value
+        rsi        = ind_results[RSI_14].value
+        atr        = ind_results[ATR_14].value
+
+        # Guard: IndicatorResult.value is None when the series produced no
+        # valid output despite bar count passing _MIN_BARS (edge case).
+        if any(v is None for v in (ema20_last, ema50_last, rsi, atr)):
+            logger.debug(
+                "MarketScanner: None indicator value for %s/%s; skipping",
+                pair, timeframe,
+            )
+            return None
+
+        price = float(bars[-1]["close"])
 
         # ── Structural observations (no trading decisions) ────────────────
-        ema_bullish      = ema20_last > ema50_last
+        ema_bullish       = ema20_last > ema50_last
         price_above_ema20 = price > ema20_last
         rsi_bullish       = rsi > 50.0
         rsi_strong_bull   = rsi > 60.0
