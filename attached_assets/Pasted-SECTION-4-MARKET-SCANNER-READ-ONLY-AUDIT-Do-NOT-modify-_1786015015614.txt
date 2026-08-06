@@ -1,0 +1,174 @@
+SECTION 4 — MARKET SCANNER (READ-ONLY AUDIT)
+
+Do NOT modify, create, rename, or delete any files.
+
+This is a READ-ONLY audit only.
+
+Read every file related to the Market Scanner and any files that directly interact with it, then produce a complete implementation audit against the Section 4 specification.
+
+Read at minimum all relevant files including (expand if necessary):
+
+- backend/app/modules/market_scanner/**
+- backend/app/modules/market_data_engine/** (or equivalent market data module)
+- backend/app/modules/indicators/**
+- backend/app/modules/smc/**
+- backend/app/modules/ai_engine/**
+- backend/app/api/v1/**
+- backend/app/core/config.py
+- backend/app/db/**
+- backend/main.py
+
+Compare the existing implementation ONLY against this Section 4 specification.
+
+For every requirement below, report:
+
+- ✅ Fully implemented
+- 🟡 Partially implemented
+- ❌ Missing
+
+Verify individually:
+
+1. Purpose
+- Scanner only identifies opportunities.
+- Scanner does NOT generate Buy/Sell signals.
+- Scanner does NOT execute trades.
+- Scanner does NOT calculate risk.
+
+2. Workflow
+- Receives data from Market Data Engine.
+- Passes candidate pairs to Technical Indicators.
+- Passes candidate pairs to SMC Engine.
+- Passes candidate pairs to AI Engine.
+
+3. Currency pairs
+Verify all required pairs:
+- EURUSD
+- GBPUSD
+- USDJPY
+- USDCHF
+- AUDUSD
+- USDCAD
+- NZDUSD
+- EURJPY
+- GBPJPY
+- EURGBP
+
+4. Supported timeframes
+Verify:
+- M1
+- M5
+- M15
+- M30
+- H1
+- H4
+
+5. Scanner checks
+Verify whether the scanner evaluates:
+
+- Trend
+    - Uptrend
+    - Downtrend
+    - Sideways
+
+- Volatility
+    - ATR based
+
+- Volume
+    - High
+    - Normal
+    - Low
+
+- Spread filtering
+
+- Trading session detection
+    - Asian
+    - London
+    - New York
+    - Session overlap
+
+6. Opportunity detection
+
+Verify the scanner only selects candidate pairs.
+
+Confirm it does NOT create trading signals.
+
+7. Priority ranking
+
+Verify:
+
+- High
+- Medium
+- Low
+
+Explain exactly how priority is calculated.
+
+8. Continuous monitoring
+
+Verify:
+
+- continuous monitoring
+- updates on new ticks
+- updates on new candles
+- async monitoring
+
+9. Performance
+
+Verify:
+
+- async implementation
+- parallel pair scanning
+- parallel timeframe scanning
+
+10. Output
+
+Verify whether the scanner outputs:
+
+- Symbol
+- Timeframe
+- Current Price
+- Trend Status
+- Volatility Status
+- Volume Status
+- Spread
+- Session
+- Priority Level
+- Timestamp
+
+11. Downstream wiring
+
+Verify exactly what is sent to:
+
+- Technical Indicators
+- SMC Engine
+- AI Engine
+
+12. Rules
+
+Verify that the scanner:
+
+- never executes trades
+- never generates buy/sell decisions
+- never calculates risk
+
+13. Exact files
+
+List:
+
+- files already implementing Section 4
+- partially implementing Section 4
+- files that would require modification
+- new files (if any) that would be needed
+
+14. Completion
+
+Estimate completion percentage with justification.
+
+IMPORTANT
+
+Do NOT write any code.
+
+Do NOT propose implementation.
+
+Do NOT change any file.
+
+Only produce a complete technical audit of Section 4.
