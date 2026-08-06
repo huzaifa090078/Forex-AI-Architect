@@ -38,7 +38,7 @@ automatically once an MT5 terminal becomes reachable.
 import asyncio
 import logging
 from datetime import datetime
-from typing import Any, Callable, Coroutine, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Coroutine, Dict, List, Optional, Tuple
 
 from app.modules.market_scanner.market_data_service import MarketDataService
 from app.modules.market_scanner.scanner import FOREX_PAIRS, TIMEFRAMES
@@ -132,8 +132,13 @@ class MarketDataFeed:
 
     async def stop(self) -> None:
         """
-        Stop the live-data background loops gracefully.
-        Waits for in-flight jobs to finish (up to 5 s per task).
+        Stop the live-data background loops gracefully, then disconnect MT5.
+
+        1. Sets _running = False so loops exit on their next iteration.
+        2. Cancels the asyncio Tasks and waits up to 5 s each for them to
+           acknowledge the cancellation.
+        3. Calls MarketDataService.shutdown() to close the MT5 connection
+           cleanly.  On non-Windows platforms the disconnect is a no-op.
         """
         self._running = False
         for task in (self._tick_task, self._candle_task):
@@ -145,6 +150,9 @@ class MarketDataFeed:
                     pass
         self._tick_task = None
         self._candle_task = None
+        # Disconnect MT5 after loops have stopped so no in-flight request
+        # races with the shutdown call.
+        await self._data_service.shutdown()
         logger.info("MarketDataFeed stopped.")
 
     @property

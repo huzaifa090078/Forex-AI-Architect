@@ -42,6 +42,35 @@ def _trend_from_bars(bars: list) -> str:
     return "ranging"
 
 
+def _volatility_from_bars(bars: list) -> Optional[float]:
+    """
+    Compute ATR(14) as a percentage of the last close price.
+
+    Uses the simple ATR formula (mean of True Range over 14 bars) as a
+    volatility proxy.  Returns None when fewer than 15 bars are available.
+    The value is expressed as a percentage, e.g. 0.0650 means 0.065 % ATR.
+    """
+    if len(bars) < 15:
+        return None
+    closes = np.array([b["close"] for b in bars], dtype=float)
+    highs  = np.array([b["high"]  for b in bars], dtype=float)
+    lows   = np.array([b["low"]   for b in bars], dtype=float)
+    if len(closes) < 2:
+        return None
+    tr = np.maximum(
+        highs[1:] - lows[1:],
+        np.maximum(
+            np.abs(highs[1:] - closes[:-1]),
+            np.abs(lows[1:]  - closes[:-1]),
+        ),
+    )
+    atr   = float(tr[-14:].mean()) if len(tr) >= 14 else float(tr.mean())
+    price = float(closes[-1])
+    if price <= 0.0:
+        return None
+    return round(atr / price * 100.0, 4)
+
+
 async def _build_pair_out(pair: str) -> Optional[MarketPairOut]:
     """
     Fetch tick and H1 OHLCV for one pair concurrently, build MarketPairOut.
@@ -62,7 +91,7 @@ async def _build_pair_out(pair: str) -> Optional[MarketPairOut]:
         ask=tick["ask"],
         spread=round(tick["spread"], 5),
         change_24h=tick["change_24h"],
-        volatility=None,
+        volatility=_volatility_from_bars(bars),
         trend=_trend_from_bars(bars),
         updated_at=datetime.now(timezone.utc),
     )

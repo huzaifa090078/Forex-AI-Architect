@@ -37,7 +37,6 @@ from app.modules.market_scanner.interfaces import IMarketDataProvider
 from app.modules.market_scanner.validation import (
     validate_bars,
     validate_tick,
-    BarValidationError,
     TickValidationError,
 )
 from app.modules.mt5_integration.interfaces import IMT5Connector
@@ -195,6 +194,31 @@ class MarketDataService(IMarketDataProvider):
                 raise
             # One retry after successful reconnect
             return await coro_factory()
+
+    # ── Shutdown ──────────────────────────────────────────────────────────────
+
+    async def shutdown(self) -> None:
+        """
+        Gracefully disconnect from MT5.
+
+        Called by MarketDataFeed.stop() after background loops have been
+        cancelled so the MT5 terminal receives a clean shutdown signal.
+
+        On non-Windows platforms the MetaTrader5 package is unavailable and
+        disconnect() will raise RuntimeError; that is caught and logged at
+        DEBUG level so shutdown is never blocked by a platform limitation.
+        """
+        if not self._connected:
+            return
+        try:
+            await self._connector.disconnect()
+            self._connected = False
+            logger.info("MarketDataService: MT5 disconnected cleanly.")
+        except RuntimeError as exc:
+            # Expected on non-Windows — MT5 package not available.
+            logger.debug("MarketDataService: disconnect skipped — %s", exc)
+        except Exception as exc:
+            logger.warning("MarketDataService: disconnect raised unexpected error: %s", exc)
 
     # ── IMarketDataProvider ───────────────────────────────────────────────────
 
