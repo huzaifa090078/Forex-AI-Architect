@@ -12,6 +12,7 @@ from app.api.router import api_router
 from app.core.config import settings
 from app.core.database import engine, Base
 from app.modules.market_scanner.live_feed import market_data_feed
+from app.modules.market_scanner.scanner import market_scanner as _market_scanner
 
 # ---------------------------------------------------------------------------
 # Application factory
@@ -44,6 +45,28 @@ def create_app() -> FastAPI:
     app.include_router(api_router, prefix="/api")
 
     # ── Lifecycle ───────────────────────────────────────────────────────────
+    async def _on_candle(pair: str, timeframe: str, bar: dict) -> None:
+        """
+        Candle event callback — automatically triggered by MarketDataFeed
+        whenever a new completed candle is detected for any pair/timeframe.
+
+        Re-scans the affected pair across all timeframes so the best
+        opportunity is always up-to-date without polling.
+        """
+        try:
+            result = await _market_scanner.scan_pair(pair)
+            if result is not None:
+                logger.info(
+                    "Candle scan [%s/%s]: %s → %s score=%.2f priority=%s session=%s",
+                    pair, timeframe,
+                    result.pair, result.direction,
+                    result.score, result.priority_level, result.session,
+                )
+        except Exception as exc:
+            logger.error(
+                "Candle-triggered scan failed for %s/%s: %s", pair, timeframe, exc
+            )
+
     @app.on_event("startup")
     async def on_startup() -> None:
         # Create all tables (dev convenience — use Alembic in production)
@@ -55,6 +78,11 @@ def create_app() -> FastAPI:
         # on non-Windows platforms the connector raises RuntimeError which the
         # feed catches and logs as a warning, so startup is never blocked.
         await market_data_feed.start()
+
+        # Wire the scanner to the candle feed — every completed candle
+        # automatically triggers a fresh scan for the affected pair.
+        # Uses the existing subscribe_candles() infrastructure; no polling loop.
+        market_data_feed.subscribe_candles(_on_candle)
 
     @app.on_event("shutdown")
     async def on_shutdown() -> None:

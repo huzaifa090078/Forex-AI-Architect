@@ -8,20 +8,39 @@ detects setup conditions, and hands promising pairs to the AI Engine.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
+from enum import Enum
 from typing import Any, Dict, List, Optional
+
+
+class PriorityLevel(str, Enum):
+    """Scanner opportunity priority, derived from composite score."""
+    HIGH   = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW    = "LOW"
 
 
 @dataclass
 class ScanResult:
     """A single market opportunity identified by the scanner."""
-    pair: str
-    direction: str                     # "buy" | "sell"
-    score: float                       # 0.0 – 1.0 composite opportunity score
-    smc_pattern: str                   # e.g. "OB+BOS", "FVG+CHoCH"
-    timeframe: str                     # e.g. "H4", "H1", "M15"
-    confluence_factors: List[str] = field(default_factory=list)
-    detected_at: datetime = field(default_factory=datetime.utcnow)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    # ── Required fields (no defaults) ────────────────────────────────────────
+    pair:              str    # e.g. "EURUSD"
+    direction:         str    # "buy" | "sell" | "ranging"
+    score:             float  # 0.0 – 1.0 composite opportunity score
+    smc_pattern:       str    # e.g. "EMA Bullish Structure + RSI Momentum"
+    timeframe:         str    # e.g. "H4", "H1", "M15"
+    trend_status:      str    # "bullish" | "bearish" | "ranging"
+    volatility_status: str    # "High" | "Normal" | "Low"
+    volume_status:     str    # "High Volume" | "Normal Volume" | "Low Volume"
+    current_price:     float  # last close price at scan time
+    priority_level:    str    # PriorityLevel value: "HIGH" | "MEDIUM" | "LOW"
+
+    # ── Optional / defaulted fields ───────────────────────────────────────────
+    spread:             Optional[float]   = None          # live bid/ask spread
+    session:            str               = "Unknown"     # active trading session
+    confluence_factors: List[str]         = field(default_factory=list)
+    detected_at:        datetime          = field(default_factory=datetime.utcnow)
+    metadata:           Dict[str, Any]    = field(default_factory=dict)
 
 
 class IMarketDataProvider(ABC):

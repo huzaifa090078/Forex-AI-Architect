@@ -1,0 +1,95 @@
+SECTION 4 — MARKET SCANNER
+IMPLEMENTATION TASK (PHASE 1)
+
+Read-only audit has been completed.
+
+Now implement ONLY the missing requirements listed below.
+
+STRICT RULES
+
+- Modify only the files required for these changes.
+- Do NOT modify Sections 1, 2, 3, 5, 6, 7 or any unrelated modules.
+- Do NOT change authentication, MT5 integration, AI Engine, SMC Engine logic, Risk Manager, Trade Manager or News Filter.
+- Preserve all existing APIs unless extension is required.
+- Keep backward compatibility.
+- Async architecture must remain unchanged.
+- No fake or mock data.
+- No placeholder implementations.
+
+Implement ONLY these items:
+
+1. Sideways / Ranging detection
+- Add a proper ranging/sideways state inside MarketScanner.
+- Do not silently discard ranging markets.
+- Extend ScanResult if required.
+
+2. Volume analysis
+- Integrate the existing VOLUME_20 indicator into the scanner.
+- Classify:
+  - High Volume
+  - Normal Volume
+  - Low Volume
+- Add volume_status to scanner output.
+
+3. Spread filtering
+- Use MarketDataService.get_tick().
+- Read live spread.
+- Ignore pairs whose spread exceeds the configured threshold.
+- Add spread to scanner output.
+
+4. Trading session detection
+Create a new utility:
+
+backend/app/modules/market_scanner/session.py
+
+It must identify:
+- Asian
+- London
+- New York
+- Overlap
+
+Integrate it into MarketScanner.
+
+5. Priority ranking
+Add:
+- HIGH
+- MEDIUM
+- LOW
+
+Priority must be derived from scanner score.
+
+6. Scanner output
+Extend ScanResult and API output so every selected opportunity contains:
+
+- Symbol
+- Timeframe
+- Current Price
+- Trend Status
+- Volatility Status
+- Volume Status
+- Spread
+- Session
+- Priority Level
+- Timestamp
+
+7. Continuous monitoring
+Wire MarketScanner to MarketDataFeed.
+
+Scanner must automatically react to completed candle events.
+
+Do NOT add polling loops.
+
+Use the existing subscribe_candles() infrastructure.
+
+After implementation:
+
+1. Run static verification.
+2. Run syntax checks.
+3. Verify all imports.
+4. Verify backward compatibility.
+5. Confirm exactly which files changed.
+6. Report every implemented requirement.
+7. Report remaining Section 4 gaps, if any.
+
+Stop after implementation report.
+Do not continue to any other section.

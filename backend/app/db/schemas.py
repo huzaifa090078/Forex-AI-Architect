@@ -178,13 +178,20 @@ class MarketOpportunityOut(BaseModel):
     """
     model_config = ConfigDict(populate_by_name=True)
 
-    pair: str
-    direction: str
-    score: float
-    smc_pattern: str = Field(alias="smcPattern")
-    timeframe: str
-    confluence_factors: List[str] = Field(default_factory=list, alias="confluenceFactors")
-    detected_at: Optional[datetime] = Field(default=None, alias="detectedAt")
+    pair:              str
+    direction:         str
+    score:             float
+    smc_pattern:       str            = Field(alias="smcPattern")
+    timeframe:         str
+    current_price:     float          = Field(alias="currentPrice")
+    trend_status:      str            = Field(alias="trendStatus")
+    volatility_status: str            = Field(alias="volatilityStatus")
+    volume_status:     str            = Field(alias="volumeStatus")
+    spread:            Optional[float] = None
+    session:           str            = "Unknown"
+    priority_level:    str            = Field(alias="priorityLevel")
+    confluence_factors: List[str]     = Field(default_factory=list, alias="confluenceFactors")
+    detected_at:       Optional[datetime] = Field(default=None, alias="detectedAt")
 
 
 # ─── Backtests ────────────────────────────────────────────────────────────────

@@ -15,14 +15,14 @@ import numpy as np
 from fastapi import APIRouter, HTTPException, Query
 
 from app.db.schemas import MarketOpportunityOut, MarketPairOut
-from app.modules.market_scanner.scanner import FOREX_PAIRS, TIMEFRAMES, MarketScanner
+from app.modules.market_scanner.scanner import FOREX_PAIRS, TIMEFRAMES, market_scanner as _scanner_singleton
 from app.modules.market_scanner.market_data_service import MarketDataService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# Module-level singletons — __init__ performs no I/O, safe to create at import time
-_scanner = MarketScanner()
+# Use the shared singleton from scanner module; _data_service is local to this router
+_scanner = _scanner_singleton
 _data_service = MarketDataService()
 
 
@@ -160,6 +160,13 @@ async def scan(
             score=round(r.score * 100.0, 1),   # internal 0–1 → API 0–100
             smc_pattern=r.smc_pattern,
             timeframe=r.timeframe,
+            current_price=r.current_price,
+            trend_status=r.trend_status,
+            volatility_status=r.volatility_status,
+            volume_status=r.volume_status,
+            spread=r.spread,
+            session=r.session,
+            priority_level=r.priority_level,
             confluence_factors=r.confluence_factors,
             detected_at=r.detected_at,
         )
