@@ -543,16 +543,19 @@ class VolumeAnalysisIndicator(BaseIndicator):
     Name pattern: 'VOLUME_{period}'  e.g. 'VOLUME_20'.
 
     IndicatorResult.value : dict with keys:
-      'obv'       — float : current On-Balance Volume
-      'vol_ratio' — float : current volume / SMA(volume, period)
+      'obv'            — float : current On-Balance Volume
+      'vol_ratio'      — float : current volume / SMA(volume, period)
+      'current_volume' — float : raw volume of the most recent bar
+      'avg_volume'     — float : SMA(volume, period) of the most recent bar
+      'volume_spike'   — bool  : vol_ratio > 1.5 (significantly above average)
+      'volume_drop'    — bool  : vol_ratio < 0.8 (significantly below average)
     IndicatorResult.signal:
       'buy'     — OBV rising AND volume_ratio > 1.0 (bullish volume pressure)
       'sell'    — OBV falling AND volume_ratio > 1.0 (bearish volume pressure)
       'neutral' — OBV flat or volume below average
     IndicatorResult.metadata:
-      'period'       — configured SMA period for volume normalisation
-      'obv_rising'   — bool: last OBV > 20-bar OBV SMA
-      'high_volume'  — bool: vol_ratio > 1.5 (significantly above average)
+      'period'      — configured SMA period for volume normalisation
+      'obv_rising'  — bool: last OBV > 20-bar OBV SMA
     """
 
     def __init__(self, period: int = 20) -> None:
@@ -564,10 +567,15 @@ class VolumeAnalysisIndicator(BaseIndicator):
         result = calc_volume_analysis(closes, volumes, self._period)
 
         obv       = result["obv"]
+        vol_sma   = result["vol_sma"]
         vol_ratio = result["vol_ratio"]
 
         last_obv   = _last_valid(obv)
         last_ratio = _last_valid(vol_ratio)
+        last_sma   = _last_valid(vol_sma)
+
+        # Current volume: raw volume of the last bar
+        current_volume = float(volumes[-1]) if len(volumes) > 0 else None
 
         # OBV trend: compare last OBV to its own SMA over min(20, valid_len) bars
         obv_rising = False
@@ -577,7 +585,9 @@ class VolumeAnalysisIndicator(BaseIndicator):
             obv_sma    = float(np.mean(valid_obv[-lookback:]))
             obv_rising = float(valid_obv[-1]) > obv_sma
 
-        high_volume = (last_ratio is not None) and (last_ratio > 1.5)
+        # Volume spike / drop derived from vol_ratio
+        volume_spike = (last_ratio is not None) and (last_ratio > 1.5)
+        volume_drop  = (last_ratio is not None) and (last_ratio < 0.8)
 
         # Signal: directional OBV move confirmed by above-average volume
         if last_obv is None or last_ratio is None:
@@ -592,16 +602,19 @@ class VolumeAnalysisIndicator(BaseIndicator):
         return IndicatorResult(
             name=self.name,
             value={
-                "obv":       _round(last_obv, 2),
-                "vol_ratio": _round(last_ratio, 4),
+                "obv":            _round(last_obv, 2),
+                "vol_ratio":      _round(last_ratio, 4),
+                "current_volume": _round(current_volume, 2),
+                "avg_volume":     _round(last_sma, 2),
+                "volume_spike":   volume_spike,
+                "volume_drop":    volume_drop,
             },
             status="active" if last_obv is not None else "warmup",
             timestamp=datetime.now(timezone.utc),
             signal=signal,
             metadata={
-                "period":      self._period,
-                "obv_rising":  obv_rising,
-                "high_volume": high_volume,
+                "period":     self._period,
+                "obv_rising": obv_rising,
             },
         )
 
