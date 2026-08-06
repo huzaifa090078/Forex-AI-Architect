@@ -51,15 +51,18 @@ def build_default_suite() -> IndicatorSuite:
     """
     Construct and return a fully-loaded IndicatorSuite.
 
-    Registered indicators (13 total):
+    Registered indicators (16 total):
 
     Trend
     ─────
     EMA_20   — fast trend (20-bar EMA)
     EMA_50   — mid trend (50-bar EMA); 20/50 crossover is a primary signal
+    EMA_100  — medium-term trend (100-bar EMA)
     EMA_200  — long-term trend bias (200-bar EMA)
     SMA_20   — simple trend baseline alongside EMA_20
     SMA_50   — simple trend baseline alongside EMA_50
+    SMA_100  — medium-term simple baseline (100-bar SMA)
+    SMA_200  — long-term simple baseline; widely watched institutional level
 
     Momentum
     ────────
@@ -82,16 +85,19 @@ def build_default_suite() -> IndicatorSuite:
     ADX_14   — Wilder ADX with +DI/-DI; separates trending from ranging markets
 
     Returns:
-        IndicatorSuite with all 13 indicators registered and ready to compute.
+        IndicatorSuite with all 16 indicators registered and ready to compute.
     """
     suite = IndicatorSuite()
 
     # ── Trend ─────────────────────────────────────────────────────────────────
     suite.register(EMAIndicator(period=20))
     suite.register(EMAIndicator(period=50))
+    suite.register(EMAIndicator(period=100))
     suite.register(EMAIndicator(period=200))
     suite.register(SMAIndicator(period=20))
     suite.register(SMAIndicator(period=50))
+    suite.register(SMAIndicator(period=100))
+    suite.register(SMAIndicator(period=200))
 
     # ── Momentum ──────────────────────────────────────────────────────────────
     suite.register(RSIIndicator(period=14))
@@ -119,9 +125,12 @@ def build_default_suite() -> IndicatorSuite:
 
 EMA_20     = "EMA_20"
 EMA_50     = "EMA_50"
+EMA_100    = "EMA_100"
 EMA_200    = "EMA_200"
 SMA_20     = "SMA_20"
 SMA_50     = "SMA_50"
+SMA_100    = "SMA_100"
+SMA_200    = "SMA_200"
 RSI_14     = "RSI_14"
 MACD       = "MACD"
 STOCH_RSI  = "STOCH_RSI"

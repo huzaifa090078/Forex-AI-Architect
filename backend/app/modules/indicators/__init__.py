@@ -53,9 +53,12 @@ from app.modules.indicators.suite import build_default_suite
 from app.modules.indicators.suite import (
     EMA_20,
     EMA_50,
+    EMA_100,
     EMA_200,
     SMA_20,
     SMA_50,
+    SMA_100,
+    SMA_200,
     RSI_14,
     MACD,
     STOCH_RSI,
@@ -103,8 +106,8 @@ __all__ = [
     # Suite factory
     "build_default_suite",
     # Name constants
-    "EMA_20", "EMA_50", "EMA_200",
-    "SMA_20", "SMA_50",
+    "EMA_20", "EMA_50", "EMA_100", "EMA_200",
+    "SMA_20", "SMA_50", "SMA_100", "SMA_200",
     "RSI_14",
     "MACD",
     "STOCH_RSI",
