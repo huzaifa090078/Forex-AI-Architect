@@ -16,8 +16,11 @@ Import from here to avoid coupling to internal module layout::
 
 from app.modules.smc.interfaces import (
     ISMCAnalyzer,
+    MTFAnalysis,
     SMCPattern,
     SMCStructure,
+    TimeframeAnalysis,
+    TrendBias,
     Zone,
 )
 from app.modules.smc.base import BaseSMCAnalyzer
@@ -28,6 +31,9 @@ __all__ = [
     "SMCStructure",
     "SMCPattern",
     "Zone",
+    "TrendBias",
+    "TimeframeAnalysis",
+    "MTFAnalysis",
     "ISMCAnalyzer",
     "BaseSMCAnalyzer",
 ]

@@ -31,7 +31,14 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 
 from app.modules.smc.base import BaseSMCAnalyzer
-from app.modules.smc.interfaces import SMCPattern, SMCStructure, Zone
+from app.modules.smc.interfaces import (
+    MTFAnalysis,
+    SMCPattern,
+    SMCStructure,
+    TimeframeAnalysis,
+    TrendBias,
+    Zone,
+)
 from app.modules.smc.calculations import (
     extract_arrays,
     calc_market_structure,
@@ -46,6 +53,19 @@ logger = logging.getLogger(__name__)
 
 # Sentinel used for the pair field when the interface does not supply it.
 _PAIR_UNSET: str = ""
+
+# Canonical timeframe order, high → low. Used for priority-ranked iteration
+# throughout MTF analysis (H4 evaluated first, M5 last).
+_CANONICAL_TFS = ["H4", "H1", "M15", "M5"]
+
+# Alignment score weights for lower timeframes (H1, M15, M5).
+# Roadmap Section 6.12 hierarchy:
+#   H1  = 0.50  (primary structure — highest confirmation weight)
+#   M15 = 0.30  (confirmation layer — medium weight)
+#   M5  = 0.20  (entry context — lowest weight)
+# Weights sum to 1.0. When a timeframe is absent the score is
+# re-normalised against the sum of the available weights only.
+_TF_WEIGHTS = {"H1": 0.50, "M15": 0.30, "M5": 0.20}
 
 
 class SMCAnalyzer(BaseSMCAnalyzer):
@@ -84,6 +104,59 @@ class SMCAnalyzer(BaseSMCAnalyzer):
         if level < midpoint:
             return Zone.DISCOUNT
         return Zone.EQUILIBRIUM
+
+    @staticmethod
+    def _get_dominant_zones(
+        tf_analyses: Dict[str, TimeframeAnalysis],
+    ) -> List[SMCStructure]:
+        """
+        Identify SMC zones confirmed across ≥2 timeframes.
+
+        For each category (order_blocks, fvgs, supply_demand), every zone is
+        compared against zones from all other timeframes. Two zones are
+        considered the same level when all three conditions hold:
+          1. Same SMCPattern
+          2. Same direction
+          3. Price ranges overlap:
+               zone_a.price_low  <= zone_b.price_high
+               zone_b.price_low  <= zone_a.price_high
+
+        From each overlapping pair the higher-timeframe zone is returned
+        (iteration order is H4 → H1 → M15 → M5, so zone_a is always the
+        higher-TF candidate when a match is found further along the list).
+        Each zone appears in the output at most once.
+        """
+        dominant: List[SMCStructure] = []
+        added_ids: set = set()
+
+        for category in ("order_blocks", "fvgs", "supply_demand"):
+            # Build (timeframe, zone) list ordered high → low (H4 first)
+            ordered: List[tuple] = []
+            for tf in _CANONICAL_TFS:
+                if tf not in tf_analyses:
+                    continue
+                for zone in getattr(tf_analyses[tf], category):
+                    ordered.append((tf, zone))
+
+            # For each zone find an overlap from a different timeframe
+            for i, (tf_a, zone_a) in enumerate(ordered):
+                for tf_b, zone_b in ordered[i + 1:]:
+                    if tf_b == tf_a:
+                        continue
+                    if (
+                        zone_a.pattern    == zone_b.pattern
+                        and zone_a.direction  == zone_b.direction
+                        and zone_a.price_low  <= zone_b.price_high
+                        and zone_b.price_low  <= zone_a.price_high
+                    ):
+                        # zone_a is the higher-TF version; add it once
+                        zone_id = id(zone_a)
+                        if zone_id not in added_ids:
+                            dominant.append(zone_a)
+                            added_ids.add(zone_id)
+                        break   # one confirmed overlap is sufficient
+
+        return dominant
 
     # ── ISMCAnalyzer — detect_market_structure ────────────────────────────────
 
@@ -503,3 +576,152 @@ class SMCAnalyzer(BaseSMCAnalyzer):
             timeframe, len(structures),
         )
         return structures
+
+    # ── ISMCAnalyzer — analyze_multi_timeframe ────────────────────────────────
+
+    def analyze_multi_timeframe(
+        self,
+        ohlcv_per_timeframe: Dict[str, List[Dict[str, Any]]],
+    ) -> MTFAnalysis:
+        """
+        Aggregate SMC analysis across multiple timeframes.
+
+        Roadmap hierarchy (Section 6.12):
+          H4  — higher-timeframe bias source
+          H1  — primary market structure
+          M15 — confirmation layer
+          M5  — entry context
+
+        Alignment score weighting (lower timeframes only):
+          H1  = 0.50  (primary structure — highest confirmation weight)
+          M15 = 0.30  (confirmation layer — medium weight)
+          M5  = 0.20  (entry context — lowest weight)
+        Weights sum to 1.0 across all three lower timeframes. When one or
+        more are absent, the score is re-normalised against the sum of the
+        available weights only.
+
+        Analysis-only: this method makes no trading decisions, computes no
+        lot sizes, and applies no risk rules. It is a pure aggregation of
+        existing detect_* output.
+
+        Args:
+            ohlcv_per_timeframe — dict mapping timeframe label to OHLCV bar
+                                  list. Accepts any subset of the canonical
+                                  set {"H4", "H1", "M15", "M5"}.
+
+        Returns:
+            MTFAnalysis with pair="" (the _PAIR_UNSET sentinel).
+            Caller sets pair after receiving the result if needed.
+        """
+        # ── Step 1: Available and missing timeframes ──────────────────────
+        available: List[str] = [
+            tf for tf in _CANONICAL_TFS if tf in ohlcv_per_timeframe
+        ]
+        missing: List[str] = [
+            tf for tf in _CANONICAL_TFS if tf not in ohlcv_per_timeframe
+        ]
+
+        # ── Step 2: Per-timeframe detection ──────────────────────────────
+        tf_analyses: Dict[str, TimeframeAnalysis] = {}
+        for tf in available:
+            ohlcv = ohlcv_per_timeframe[tf]
+            structures    = self.detect_market_structure(ohlcv, tf)
+            order_blocks  = self.detect_order_blocks(ohlcv, tf)
+            fvgs          = self.detect_fair_value_gaps(ohlcv, tf)
+            liquidity     = self.detect_liquidity_levels(ohlcv, tf)
+            supply_demand = self.detect_supply_demand(ohlcv, tf)
+
+            # Derive per-TF bias from most recent structure event
+            tf_bias = TrendBias.NEUTRAL
+            if structures:
+                most_recent = max(
+                    structures,
+                    key=lambda s: s.metadata.get("bar_index", 0),
+                )
+                if most_recent.direction == TrendBias.BULLISH:
+                    tf_bias = TrendBias.BULLISH
+                elif most_recent.direction == TrendBias.BEARISH:
+                    tf_bias = TrendBias.BEARISH
+
+            tf_analyses[tf] = TimeframeAnalysis(
+                timeframe=tf,
+                structures=structures,
+                order_blocks=order_blocks,
+                fvgs=fvgs,
+                liquidity=liquidity,
+                supply_demand=supply_demand,
+                bias=tf_bias,
+            )
+
+        # ── Step 3: Overall bias (H4 preferred; H1 fallback) ─────────────
+        overall_bias = TrendBias.NEUTRAL
+        for tf in ("H4", "H1"):
+            if tf in tf_analyses and tf_analyses[tf].bias != TrendBias.NEUTRAL:
+                overall_bias = tf_analyses[tf].bias
+                break
+
+        # ── Step 4: Dominant timeframe ────────────────────────────────────
+        # Highest-priority timeframe with a non-neutral bias AND at least
+        # one confirmed structure event.
+        dominant_timeframe: str = ""
+        for tf in _CANONICAL_TFS:
+            if (
+                tf in tf_analyses
+                and tf_analyses[tf].bias != TrendBias.NEUTRAL
+                and tf_analyses[tf].structures
+            ):
+                dominant_timeframe = tf
+                break
+
+        # ── Step 5: Weighted alignment score and conflict detection ───────
+        lower_tfs: List[str] = [
+            tf for tf in ("H1", "M15", "M5") if tf in tf_analyses
+        ]
+
+        if lower_tfs and overall_bias != TrendBias.NEUTRAL:
+            weight_sum   = sum(_TF_WEIGHTS.get(tf, 0.0) for tf in lower_tfs)
+            agree_weight = sum(
+                _TF_WEIGHTS.get(tf, 0.0)
+                for tf in lower_tfs
+                if tf_analyses[tf].bias == overall_bias
+            )
+            alignment_score = (agree_weight / weight_sum) if weight_sum > 0.0 else 0.0
+        else:
+            alignment_score = 0.0
+
+        # A timeframe conflicts only when it actively opposes the bias;
+        # NEUTRAL timeframes are not conflicts — they simply lack a signal.
+        conflicting_timeframes: List[str] = [
+            tf for tf in lower_tfs
+            if tf_analyses[tf].bias != overall_bias
+            and tf_analyses[tf].bias != TrendBias.NEUTRAL
+        ]
+
+        # H1 must agree AND overall bias must be non-neutral for alignment.
+        aligned: bool = (
+            "H1" in tf_analyses
+            and tf_analyses["H1"].bias == overall_bias
+            and overall_bias != TrendBias.NEUTRAL
+        )
+
+        # ── Step 6: Dominant zone detection ──────────────────────────────
+        dominant_zones = self._get_dominant_zones(tf_analyses)
+
+        logger.debug(
+            "analyze_multi_timeframe: bias=%s aligned=%s score=%.2f "
+            "available=%s dominant_tf=%s dominant_zones=%d",
+            overall_bias.value, aligned, alignment_score,
+            available, dominant_timeframe, len(dominant_zones),
+        )
+
+        return MTFAnalysis(
+            bias=overall_bias,
+            aligned=aligned,
+            alignment_score=round(alignment_score, 4),
+            dominant_timeframe=dominant_timeframe,
+            conflicting_timeframes=conflicting_timeframes,
+            available_timeframes=available,
+            missing_timeframes=missing,
+            timeframes=tf_analyses,
+            dominant_zones=dominant_zones,
+        )

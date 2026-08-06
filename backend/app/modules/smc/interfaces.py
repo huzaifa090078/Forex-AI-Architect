@@ -33,6 +33,21 @@ class Zone(str, Enum):
     DISCOUNT = "discount"
 
 
+class TrendBias(str, Enum):
+    """
+    Directional bias derived from SMC market structure events.
+
+    Used consistently across TimeframeAnalysis and MTFAnalysis to avoid
+    raw string literals for direction/bias fields.
+
+    Values intentionally mirror the 'direction' strings used in
+    SMCStructure so equality comparisons work across both types.
+    """
+    BULLISH = "bullish"
+    BEARISH = "bearish"
+    NEUTRAL = "neutral"
+
+
 @dataclass
 class SMCStructure:
     """A detected SMC structure on a specific pair/timeframe."""
@@ -47,6 +62,73 @@ class SMCStructure:
     validated: bool = False              # True after price confirms the level
     detected_at: datetime = field(default_factory=datetime.utcnow)
     metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class TimeframeAnalysis:
+    """
+    All SMC detection results for a single timeframe.
+
+    Replaces parallel per-category dicts with a single owned container
+    so every timeframe is fully self-contained. The caller (e.g. the
+    market scanner) correlates results across timeframes via MTFAnalysis.
+
+    bias:
+        Derived from the most recent market structure event (BOS/CHoCH)
+        on this timeframe. NEUTRAL when no structure events are present.
+    """
+    timeframe:    str                  # "H4" | "H1" | "M15" | "M5"
+    structures:   List[SMCStructure]   # BOS and CHoCH events
+    order_blocks: List[SMCStructure]   # Order Blocks and Breaker Blocks
+    fvgs:         List[SMCStructure]   # Fair Value Gaps and Imbalances
+    liquidity:    List[SMCStructure]   # Liquidity pools, sweeps, swing levels
+    supply_demand: List[SMCStructure]  # Supply/Demand Zones and Mitigation Blocks
+    bias:         TrendBias            # Direction bias for this timeframe
+
+
+@dataclass
+class MTFAnalysis:
+    """
+    Aggregated multi-timeframe SMC analysis result.
+
+    Roadmap hierarchy (Section 6.12):
+      H4  — higher-timeframe bias source
+      H1  — primary market structure
+      M15 — confirmation layer
+      M5  — entry context
+
+    Alignment score weighting (H1 highest, M5 lowest):
+      H1  = 0.50
+      M15 = 0.30
+      M5  = 0.20
+    Weights sum to 1.0 across all three lower timeframes. When one or
+    more lower timeframes are absent, the score is computed using only
+    the available weights, re-normalised to the available weight sum.
+
+    pair:
+        Left as "" (the _PAIR_UNSET sentinel) by the SMC engine.
+        Caller enriches this field after receiving the result.
+
+    dominant_timeframe:
+        The highest timeframe with a non-neutral bias and at least one
+        confirmed structure event. "" when none qualify.
+
+    conflicting_timeframes:
+        Lower timeframes (H1/M15/M5) whose bias actively contradicts
+        the overall bias. Neutral timeframes are excluded — absence of
+        signal is not a conflict.
+    """
+    bias:                   TrendBias
+    aligned:                bool
+    alignment_score:        float
+    dominant_timeframe:     str
+    conflicting_timeframes: List[str]
+    available_timeframes:   List[str]
+    missing_timeframes:     List[str]
+    timeframes:             Dict[str, TimeframeAnalysis]
+    dominant_zones:         List[SMCStructure]
+    analysed_at:            datetime = field(default_factory=datetime.utcnow)
+    pair:                   str = ""
 
 
 class ISMCAnalyzer(ABC):
@@ -95,5 +177,19 @@ class ISMCAnalyzer(ABC):
         Supply Zone — base area preceding a strong bearish impulse.
         Demand Zone — base area preceding a strong bullish impulse.
         Mitigated zones are returned as MITIGATION_BLOCK.
+        """
+        ...
+
+    @abstractmethod
+    def analyze_multi_timeframe(
+        self,
+        ohlcv_per_timeframe: Dict[str, List[Dict[str, Any]]],
+    ) -> MTFAnalysis:
+        """
+        Aggregate SMC analysis across multiple timeframes.
+
+        Accepts any subset of {"H4", "H1", "M15", "M5"} as keys.
+        The caller is responsible for pair association;
+        MTFAnalysis.pair is always "" on return (the _PAIR_UNSET sentinel).
         """
         ...

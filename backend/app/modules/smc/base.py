@@ -5,7 +5,7 @@ Smart Money Concepts — base implementation scaffold.
 import logging
 from typing import Any, Dict, List
 
-from app.modules.smc.interfaces import ISMCAnalyzer, SMCStructure, Zone
+from app.modules.smc.interfaces import ISMCAnalyzer, MTFAnalysis, SMCStructure, Zone
 
 logger = logging.getLogger(__name__)
 
@@ -50,3 +50,9 @@ class BaseSMCAnalyzer(ISMCAnalyzer):
         self, ohlcv: List[Dict[str, Any]], timeframe: str
     ) -> List[SMCStructure]:
         raise NotImplementedError("Implement supply and demand zone detection")
+
+    def analyze_multi_timeframe(
+        self,
+        ohlcv_per_timeframe: Dict[str, List[Dict[str, Any]]],
+    ) -> MTFAnalysis:
+        raise NotImplementedError("Implement multi-timeframe SMC aggregation")
