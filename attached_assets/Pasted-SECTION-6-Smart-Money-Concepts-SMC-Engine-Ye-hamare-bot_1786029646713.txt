@@ -1,0 +1,219 @@
+SECTION 6 — Smart Money Concepts (SMC) Engine
+Ye hamare bot ka sab se important analysis module hoga.
+Technical Indicators market ko mathematically dekhte hain, jab ke SMC market ko institutional nazariye se analyze karega.
+Ye module hamare bot ki core strength hoga.
+________________________________________
+6.1 Purpose
+SMC Engine ka kaam:
+•	Market Structure samajhna. 
+•	Institutional movement identify karna. 
+•	Liquidity detect karna. 
+•	High-probability zones identify karna. 
+•	AI Engine ko high-quality context provide karna. 
+________________________________________
+6.2 Workflow
+Market Data Engine
+        │
+        ▼
+     SMC Engine
+        │
+        ├──► AI Engine
+        ├──► Risk Manager
+        └──► Dashboard
+________________________________________
+6.3 Core SMC Features
+1. Market Structure
+Purpose
+Market kis direction mein move kar raha hai.
+Detect Karega
+•	Bullish Structure 
+•	Bearish Structure 
+•	Sideways Structure 
+________________________________________
+2. Swing High & Swing Low
+Purpose
+Important highs aur lows identify karna.
+Use
+•	Structure 
+•	Liquidity 
+•	BOS 
+•	CHoCH 
+________________________________________
+3. Break of Structure (BOS)
+Purpose
+Trend continuation confirm karna.
+Detect Karega
+•	Bullish BOS 
+•	Bearish BOS 
+Use
+•	Trend confirmation 
+•	Entry confirmation 
+________________________________________
+4. Change of Character (CHoCH)
+Purpose
+Trend reversal identify karna.
+Detect Karega
+•	Bullish CHoCH 
+•	Bearish CHoCH 
+Use
+•	Early reversal 
+•	Trend change 
+________________________________________
+5. Order Blocks (OB)
+Purpose
+Institutional buying/selling zones identify karna.
+Detect Karega
+•	Bullish Order Block 
+•	Bearish Order Block 
+Information
+•	Zone High 
+•	Zone Low 
+•	Fresh/Mitigated status 
+•	Number of retests 
+Use
+•	Entry area 
+•	SL placement 
+•	TP planning 
+________________________________________
+6. Liquidity Zones
+Purpose
+Jahan retail traders ke Stop Losses jama hote hain.
+Detect Karega
+•	Buy-side Liquidity 
+•	Sell-side Liquidity 
+•	Equal Highs 
+•	Equal Lows 
+Use
+•	Liquidity sweep detection 
+•	Fake breakout confirmation 
+________________________________________
+7. Liquidity Sweep
+Purpose
+Institutional stop hunt identify karna.
+Detect Karega
+•	Buy-side Sweep 
+•	Sell-side Sweep 
+Use
+•	Reversal confirmation 
+•	High-probability entries 
+________________________________________
+8. Fair Value Gap (FVG)
+Purpose
+Price imbalance detect karna.
+Detect Karega
+•	Bullish FVG 
+•	Bearish FVG 
+Information
+•	Gap High 
+•	Gap Low 
+•	Filled / Unfilled status 
+Use
+•	Entry confirmation 
+•	Target areas 
+________________________________________
+9. Supply & Demand Zones
+Supply Zone
+Potential selling area.
+Demand Zone
+Potential buying area.
+Use
+•	Reversal 
+•	Trend continuation 
+•	Trade confirmation 
+________________________________________
+10. Premium / Discount Zones
+Purpose
+Price expensive hai ya cheap.
+Detect Karega
+•	Premium Area 
+•	Equilibrium 
+•	Discount Area 
+Use
+•	Better entries 
+•	Better exits 
+________________________________________
+11. Mitigation Detection
+Purpose
+Check karega ke Order Block ya FVG already test ho chuka hai ya fresh hai.
+Status
+•	Fresh 
+•	Partially Mitigated 
+•	Fully Mitigated 
+________________________________________
+12. Multi-Timeframe Structure
+SMC sirf ek timeframe nahi dekhega.
+Use karega:
+•	M5 
+•	M15 
+•	H1 
+•	H4 
+Example:
+•	H4 trend 
+•	H1 structure 
+•	M15 confirmation 
+•	M5 entry 
+________________________________________
+13. Confluence Detection
+Ye module multiple confirmations combine karega.
+Example:
+•	BOS 
+•	Fresh Order Block 
+•	Liquidity Sweep 
+•	FVG 
+•	RSI Confirmation 
+•	EMA Trend 
+Jitni zyada confirmations, utni strong setup.
+________________________________________
+6.4 Dashboard Output
+Har detected setup ke liye:
+•	Symbol 
+•	Timeframe 
+•	Structure 
+•	BOS 
+•	CHoCH 
+•	Order Block 
+•	Liquidity 
+•	FVG 
+•	Supply/Demand 
+•	Premium/Discount 
+•	Confluence Score 
+•	Timestamp 
+________________________________________
+6.5 Rules
+SMC Engine:
+•	✅ Analysis karega. 
+•	✅ Zones identify karega. 
+•	✅ Structure detect karega. 
+•	✅ AI ko context dega. 
+Lekin:
+•	❌ Trade execute nahi karega. 
+•	❌ Lot size decide nahi karega. 
+•	❌ Risk calculate nahi karega. 
+________________________________________
+6.6 Future Expansion
+Future versions mein add kiya ja sakta hai:
+•	SMT Divergence 
+•	Kill Zones (London / New York) 
+•	ICT Unicorn Setup 
+•	Breaker Blocks 
+•	Rejection Blocks 
+•	Balanced Price Range (BPR) 
+•	Optimal Trade Entry (OTE) 
+•	Volume Imbalance 
+________________________________________
+SMC Engine Summary
+Is module ki zimmedari:
+•	✅ Market Structure 
+•	✅ Swing High / Low 
+•	✅ BOS 
+•	✅ CHoCH 
+•	✅ Order Blocks 
+•	✅ Liquidity Zones 
+•	✅ Liquidity Sweeps 
+•	✅ Fair Value Gaps (FVG) 
+•	✅ Supply & Demand 
+•	✅ Premium / Discount 
+•	✅ Mitigation Detection 
+•	✅ Multi-Timeframe Analysis 
+•	✅ Confluence Detection 
+Ye hamare bot ka sab se powerful analysis module hoga aur AI Engine ke liye high-quality market context provide karega.
