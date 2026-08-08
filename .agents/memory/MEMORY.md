@@ -1,0 +1,5 @@
+- [Section 11 auth guards](section11-auth-guards.md) — dashboard/signals/logs/settings endpoints all require JWT auth; missing guard → test 401 failures.
+- [Asyncpg event loop tests](asyncpg-test-event-loop.md) — Section 11 tests need session-scoped event_loop fixture + pytest.ini asyncio_mode=auto to avoid "Future attached to different loop" errors.
+- [Settings service transient obj](settings-transient.md) — use _FakeSettings plain class instead of BotSettings.__new__ to avoid missing _sa_instance_state when bot user doesn't exist.
+- [PyJWT requirements](pyjwt-requirements.md) — PyJWT==2.8.0 must be in requirements.txt; passlib[bcrypt] already there; both needed for auth service.
+- [WebSocket CORS](ws-cors.md) — In dev (APP_ENV=development), CORSMiddleware must use allow_origins=["*"] with allow_credentials=False; wildcard+credentials disallowed by spec.

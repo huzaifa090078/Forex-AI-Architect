@@ -1,0 +1,1389 @@
+# SECTION 11 — DASHBOARD & USER INTERFACE (UI/UX)
+# MASTER IMPLEMENTATION PROMPT
+
+You are implementing SECTION 11 of the existing Forex-AI-Architect project.
+
+IMPORTANT:
+This is an existing multi-module trading bot. Do NOT rebuild the project from scratch.
+Do NOT replace existing architecture.
+Do NOT remove or weaken existing functionality.
+Do NOT modify Sections 1–10 unnecessarily.
+
+Your first responsibility is to understand the complete existing codebase and integrate Section 11 into the existing architecture.
+
+==================================================
+1. CORE OBJECTIVE
+==================================================
+
+Build a professional, responsive, fast Dashboard/UI that acts as the bot's control center.
+
+The Dashboard must:
+
+- Display live market information.
+- Display live MT5/Exness connection status.
+- Display AI signals.
+- Display SMC analysis.
+- Display open trades.
+- Display account information.
+- Display trading performance.
+- Display upcoming news.
+- Display notifications.
+- Display system/trading logs.
+- Provide configuration/settings controls where already supported by backend.
+- Provide safe control actions through existing backend APIs.
+
+The Dashboard is a PRESENTATION + CONTROL layer.
+
+The Dashboard MUST NOT:
+
+- Generate trading signals itself.
+- Perform independent market analysis.
+- Calculate an alternative AI decision.
+- Calculate an alternative risk decision.
+- Directly call MetaTrader5 Python APIs.
+- Directly connect to Exness.
+- Bypass Risk Manager.
+- Bypass Trade Manager.
+- Implement a second authentication mechanism.
+- Create fake market data to make the UI appear live.
+
+All business logic must remain in backend modules.
+
+==================================================
+2. FIRST: INSPECT THE EXISTING PROJECT
+==================================================
+
+Before writing code, inspect the complete repository structure.
+
+Read and understand at minimum:
+
+- Backend application structure.
+- FastAPI application.
+- Existing API routes.
+- Existing authentication.
+- Existing database models/schemas.
+- Market Scanner.
+- Technical Indicators.
+- SMC Engine.
+- AI Decision Engine.
+- Risk Manager.
+- Trade Manager.
+- MT5 Connector.
+- News Filter.
+- Existing configuration/settings.
+- Existing tests.
+- Existing frontend, if any.
+- Existing WebSocket/SSE infrastructure, if any.
+
+Specifically identify:
+
+1. Existing frontend framework.
+2. Existing frontend entry point.
+3. Existing backend API base path.
+4. Existing authentication flow.
+5. Existing market-data endpoints.
+6. Existing signal endpoints.
+7. Existing trade endpoints.
+8. Existing news endpoints.
+9. Existing account/health endpoints.
+10. Existing logging endpoints.
+11. Existing settings endpoints.
+12. Existing WebSocket/SSE support.
+
+DO NOT assume a framework if one already exists.
+
+If a frontend already exists, EXTEND it.
+
+Do not replace an existing frontend framework with another framework unless absolutely necessary and explicitly justified.
+
+==================================================
+3. ARCHITECTURE
+==================================================
+
+Use this architecture:
+
+                    MT5 / Exness
+                         |
+                         v
+                  MT5 Connector
+                         |
+                         v
+                  Backend Services
+                         |
+        +----------------+----------------+
+        |                |                |
+        v                v                v
+ Market Scanner      AI Engine       News Filter
+        |                |                |
+        +----------------+----------------+
+                         |
+                         v
+                   Risk Manager
+                         |
+                         v
+                   Trade Manager
+                         |
+                         v
+                    API Layer
+                         |
+                  WebSocket/SSE
+                         |
+                         v
+                    Dashboard
+
+The Dashboard must consume backend data.
+
+The Dashboard must NEVER communicate directly with MT5.
+
+==================================================
+4. DESIGN SYSTEM
+==================================================
+
+Create a professional trading terminal style UI.
+
+Default theme:
+
+- Light theme.
+
+Optional:
+
+- Dark theme.
+
+Design requirements:
+
+- Clean.
+- Professional.
+- Fast.
+- High information density without becoming cluttered.
+- Responsive.
+- Desktop-first.
+- Tablet compatible.
+- Mobile-friendly where practical.
+- Minimal unnecessary animation.
+- Clear status indicators.
+- Consistent spacing.
+- Consistent typography.
+- Consistent cards/tables.
+- Accessible contrast.
+- Clear error states.
+- Clear loading states.
+- Clear empty states.
+
+Do NOT create a flashy crypto-style dashboard.
+
+This is a professional Forex trading system.
+
+==================================================
+5. MAIN APPLICATION LAYOUT
+==================================================
+
+Create:
+
+TOP BAR
+LEFT SIDEBAR
+MAIN WORKSPACE
+
+Top Bar:
+
+- Bot logo/name.
+- Bot status.
+- MT5 connection status.
+- Exness/server status.
+- Current UTC time.
+- Local time.
+- Theme toggle.
+- Notification indicator.
+- Authenticated user/profile.
+
+Sidebar navigation:
+
+1. Dashboard
+2. Market Scanner
+3. Charts
+4. AI Signals
+5. Open Trades
+6. Trade History
+7. News
+8. Logs
+9. Settings
+
+The active route must be clearly highlighted.
+
+Do not expose navigation to functionality that does not exist.
+
+If a backend capability is unavailable, show an appropriate disabled/coming-soon state rather than fake functionality.
+
+==================================================
+6. DASHBOARD HOME
+==================================================
+
+Create a main dashboard containing the most important information.
+
+Recommended structure:
+
+ROW 1:
+- Bot Status
+- MT5 Status
+- Account Balance
+- Equity
+- Daily P/L
+
+ROW 2:
+- Market Watch
+- AI Signal Summary
+
+ROW 3:
+- Main Live Chart
+- SMC Analysis
+
+ROW 4:
+- Open Trades
+- Upcoming News
+
+ROW 5:
+- Performance
+- Recent Notifications / Logs
+
+The layout must remain responsive.
+
+==================================================
+7. BOT STATUS
+==================================================
+
+Show:
+
+- Bot Running / Stopped.
+- Backend API status.
+- MT5 connected/disconnected.
+- News Filter status.
+- Trading allowed/paused.
+- Last successful data update.
+
+Use clear states:
+
+CONNECTED
+DISCONNECTED
+STARTING
+PAUSED
+ERROR
+UNAVAILABLE
+
+Never show CONNECTED unless backend confirms it.
+
+==================================================
+8. LIVE MARKET DATA
+==================================================
+
+Create a Market Watch component.
+
+Default pairs:
+
+- EURUSD
+- GBPUSD
+- USDJPY
+- USDCHF
+- AUDUSD
+- USDCAD
+- NZDUSD
+- EURJPY
+- GBPJPY
+- EURGBP
+
+For each pair display:
+
+- Symbol.
+- Bid.
+- Ask.
+- Spread.
+- Trend.
+- Session.
+- Availability/status.
+- Last update time.
+
+Data MUST come from the backend.
+
+Do not generate random values.
+
+If MT5 is unavailable:
+
+Display:
+
+"MT5 DATA UNAVAILABLE"
+
+Do NOT substitute fake prices.
+
+==================================================
+9. LIVE CHARTS
+==================================================
+
+This is a critical requirement.
+
+Create live candlestick charts using backend market data.
+
+Supported timeframes:
+
+- M1
+- M5
+- M15
+- M30
+- H1
+- H4
+- D1
+
+Chart controls:
+
+- Symbol selector.
+- Timeframe selector.
+- Zoom.
+- Scroll.
+- Crosshair.
+- Refresh/live mode.
+- Optional fullscreen.
+
+Candles must originate from the same backend market-data pipeline used by the bot.
+
+IMPORTANT:
+
+The Dashboard and bot must see the same underlying candle data.
+
+Do NOT:
+
+- Create synthetic candles.
+- Use random candles.
+- Use unrelated public market data.
+- Calculate candles independently in frontend.
+
+The backend remains the source of truth.
+
+==================================================
+10. CHART OVERLAYS
+==================================================
+
+Where backend data exists, display:
+
+Technical indicators:
+
+- EMA
+- SMA
+- RSI where appropriate
+- VWAP where available
+- Bollinger Bands where available
+
+SMC overlays:
+
+- Order Blocks
+- BOS
+- CHoCH
+- Liquidity
+- Liquidity Sweep
+- FVG
+- Supply Zones
+- Demand Zones
+- Premium/Discount
+
+Trade overlays:
+
+- Entry
+- Stop Loss
+- Take Profit
+
+Important:
+
+Frontend must only DISPLAY backend-calculated values.
+
+Do not implement a second SMC engine in JavaScript/TypeScript.
+
+Do not implement a second indicator engine in frontend.
+
+==================================================
+11. MARKET SCANNER PAGE
+==================================================
+
+Create a dedicated Market Scanner page.
+
+Show a table containing:
+
+- Pair.
+- Timeframe.
+- Trend.
+- Volatility.
+- Volume.
+- Session.
+- Spread.
+- SMC score/confluence where available.
+- Signal status.
+- Last update.
+
+Allow:
+
+- Pair filtering.
+- Timeframe filtering.
+- Sorting.
+- Search.
+
+Do not recalculate scanner values in frontend.
+
+==================================================
+12. AI SIGNAL PAGE
+==================================================
+
+Create an AI Signals page.
+
+Each signal should display:
+
+- Pair.
+- Timeframe.
+- BUY / SELL / NO TRADE.
+- Confidence %.
+- Trade quality.
+- Trend.
+- SMC summary.
+- Indicator summary.
+- Suggested Entry.
+- Suggested SL.
+- Suggested TP.
+- Timestamp.
+- AI reason/explanation where backend provides it.
+
+Use visual states:
+
+BUY
+SELL
+NO TRADE
+
+Confidence should be clearly displayed.
+
+Example:
+
+84%
+EXCELLENT
+
+or
+
+62%
+WEAK
+
+Do not create signals locally in frontend.
+
+==================================================
+13. SMC PANEL
+==================================================
+
+Create a dedicated SMC analysis panel.
+
+Display:
+
+- Market Structure.
+- BOS.
+- CHoCH.
+- Order Block.
+- Liquidity.
+- Liquidity Sweep.
+- FVG.
+- Supply.
+- Demand.
+- Premium/Discount.
+- Confluence Score.
+
+Use backend SMC data only.
+
+If data is unavailable:
+
+"SMC DATA UNAVAILABLE"
+
+Do not invent values.
+
+==================================================
+14. OPEN TRADES
+==================================================
+
+Create Open Trades page/panel.
+
+Display:
+
+- Ticket.
+- Pair.
+- Direction.
+- Entry.
+- Current Price.
+- SL.
+- TP.
+- Lot Size.
+- P/L.
+- Duration.
+- Status.
+- Distance to SL.
+- Distance to TP.
+- RR where available.
+
+Use existing Trade Manager API.
+
+Do not directly access MT5.
+
+==================================================
+15. TRADE ACTIONS
+==================================================
+
+Where existing backend APIs support it, allow safe user actions:
+
+- Manual close.
+- Modify SL.
+- Modify TP.
+
+These actions MUST go through:
+
+Dashboard
+→ API
+→ Authentication
+→ Trade Manager
+→ Risk/validation boundaries
+→ MT5 Connector
+→ Exness
+
+Never call MT5 directly from frontend.
+
+Before destructive actions such as closing a trade:
+
+Show confirmation dialog.
+
+Example:
+
+"Are you sure you want to close EURUSD BUY?"
+
+Do not silently execute destructive actions.
+
+==================================================
+16. TRADE HISTORY
+==================================================
+
+Create Trade History page.
+
+Show:
+
+- Ticket.
+- Pair.
+- Direction.
+- Entry.
+- Exit.
+- SL.
+- TP.
+- Lot size.
+- Profit/Loss.
+- Open time.
+- Close time.
+- Duration.
+- Close reason.
+- Status.
+
+Add:
+
+- Search.
+- Date filtering.
+- Pair filtering.
+- Direction filtering.
+- Profit/loss filtering where practical.
+- Pagination.
+
+Use existing backend/database APIs.
+
+==================================================
+17. ACCOUNT PANEL
+==================================================
+
+Display:
+
+- Balance.
+- Equity.
+- Margin.
+- Free Margin.
+- Leverage.
+- Daily Profit.
+- Weekly Profit.
+- Monthly Profit.
+- Drawdown.
+
+IMPORTANT:
+
+Do not expose sensitive credentials.
+
+NEVER display:
+
+- MT5 password.
+- API keys.
+- JWT secret.
+- APP_SECRET_KEY.
+- Database credentials.
+- Internal secrets.
+
+==================================================
+18. PERFORMANCE PANEL
+==================================================
+
+Display available backend performance statistics:
+
+- Win Rate.
+- Loss Rate.
+- Total Trades.
+- Winning Trades.
+- Losing Trades.
+- Average RR.
+- Profit Factor.
+- Daily P/L.
+- Weekly P/L.
+- Monthly P/L.
+- Drawdown.
+
+Sharpe Ratio is future functionality unless already implemented.
+
+Do not calculate a misleading Sharpe Ratio in frontend.
+
+If a metric is unavailable:
+
+Show "N/A" or "Not available".
+
+==================================================
+19. NEWS PAGE
+==================================================
+
+Use existing Section 10 News Filter APIs.
+
+Display:
+
+- Event Name.
+- Currency.
+- Impact.
+- Event time.
+- Countdown.
+- Status.
+- Affected pairs where backend provides them.
+- Trading status.
+
+Statuses:
+
+UPCOMING
+LIVE
+FINISHED
+
+Display:
+
+TRADING PAUSED
+
+when the backend says trading is paused.
+
+Display:
+
+TRADING ACTIVE
+
+when appropriate.
+
+Do not create news events locally.
+
+Do not invent economic-calendar data.
+
+==================================================
+20. NOTIFICATION CENTER
+==================================================
+
+Create notification UI.
+
+Support backend events such as:
+
+- Trade Opened.
+- Trade Closed.
+- TP Hit.
+- SL Hit.
+- News Alert.
+- Trading Paused.
+- Trading Resumed.
+- Connection Lost.
+- MT5 Reconnected.
+- Daily Loss Limit.
+- Daily Profit Target.
+- System Error.
+
+If no persistent notification system exists yet:
+
+Implement a clean frontend notification layer based only on actual backend events/logs.
+
+Do not fabricate notifications.
+
+==================================================
+21. LOGS PAGE
+==================================================
+
+Create Logs page.
+
+Categories:
+
+- Connection Logs.
+- AI Logs.
+- Trade Logs.
+- Risk Logs.
+- Error Logs.
+- System Logs.
+- News Logs.
+
+Features:
+
+- Timestamp.
+- Severity.
+- Module.
+- Message.
+- Filtering.
+- Search.
+- Pagination where necessary.
+
+Sensitive information MUST be redacted.
+
+Never display passwords, secret keys, JWTs, tokens or database credentials.
+
+==================================================
+22. SETTINGS PAGE
+==================================================
+
+Create Settings UI for configuration already supported by backend.
+
+Trading settings:
+
+- Risk %.
+- Max Trades.
+- Max Daily Loss.
+- Max Daily Profit.
+
+Scanner settings:
+
+- Currency Pairs.
+- Timeframes.
+
+AI settings:
+
+- Confidence Threshold.
+- Module enable/disable where backend supports it.
+
+News settings:
+
+- High-impact news enabled.
+- Medium-impact news enabled.
+- Low-impact news enabled.
+- Pause-before-news minutes.
+- Resume-after-news minutes.
+
+Dashboard:
+
+- Theme.
+- Notifications.
+- Language if supported.
+
+IMPORTANT:
+
+Do not create settings that have no backend implementation.
+
+If a setting is UI-only, clearly mark it as UI preference.
+
+==================================================
+23. REAL-TIME DATA ARCHITECTURE
+==================================================
+
+Prefer existing WebSocket/SSE infrastructure if present.
+
+If real-time infrastructure does not exist, implement a clean backend real-time mechanism appropriate for the existing architecture.
+
+Preferred:
+
+WebSocket for:
+
+- Live prices.
+- Candle updates.
+- Trade updates.
+- Bot status.
+- Notifications.
+
+REST APIs may remain responsible for:
+
+- Historical candles.
+- Trade history.
+- Settings.
+- Initial page load.
+- Non-real-time queries.
+
+Do NOT create a separate market-data connection from the browser to MT5.
+
+Architecture must remain:
+
+MT5
+→ Backend
+→ WebSocket/SSE
+→ Dashboard
+
+==================================================
+24. DATA FRESHNESS
+==================================================
+
+Every live-data component should make stale data obvious.
+
+Where appropriate show:
+
+- Last updated timestamp.
+- Connection status.
+- Stale indicator.
+
+If data becomes stale:
+
+Do NOT continue displaying it as if it were live.
+
+Use:
+
+"STALE DATA"
+
+or
+
+"DATA UNAVAILABLE"
+
+as appropriate.
+
+==================================================
+25. LOADING STATES
+==================================================
+
+Every major component must have:
+
+- Loading state.
+- Empty state.
+- Error state.
+- Data unavailable state.
+
+Avoid blank screens.
+
+Examples:
+
+Loading:
+"Loading market data..."
+
+Empty:
+"No open trades."
+
+Error:
+"Unable to load market data."
+
+Unavailable:
+"MT5 connection unavailable."
+
+==================================================
+26. ERROR HANDLING
+==================================================
+
+Frontend must gracefully handle:
+
+- API timeout.
+- Network failure.
+- Authentication expiry.
+- WebSocket disconnect.
+- MT5 disconnect.
+- Backend unavailable.
+- Empty datasets.
+- Invalid responses.
+- Permission errors.
+
+When authentication expires:
+
+Redirect to existing login flow.
+
+Do NOT create a second login system.
+
+==================================================
+27. AUTHENTICATION
+==================================================
+
+Reuse the existing authentication mechanism.
+
+Every protected API request must use the existing auth mechanism.
+
+Do NOT:
+
+- Store passwords in frontend.
+- Hardcode tokens.
+- Create a second JWT system.
+- Bypass backend authorization.
+- Expose secrets.
+
+Use existing auth/session conventions.
+
+==================================================
+28. RESPONSIVENESS
+==================================================
+
+Desktop:
+
+Optimize for large trading screens.
+
+Tablet:
+
+Maintain usable tables and charts.
+
+Mobile:
+
+Prioritize:
+
+- Bot status.
+- Account.
+- AI signals.
+- Open trades.
+- News.
+- Critical alerts.
+
+Large tables may become horizontally scrollable on smaller screens.
+
+Do not destroy usability just to force everything into one column.
+
+==================================================
+29. PERFORMANCE
+==================================================
+
+The dashboard must remain responsive with live updates.
+
+Avoid:
+
+- Unnecessary rerenders.
+- Excessive polling.
+- Duplicate API requests.
+- Memory leaks.
+- Multiple WebSocket connections for the same data.
+- Heavy animations.
+
+Use:
+
+- Proper state management.
+- Request caching where appropriate.
+- Debounced search/filtering.
+- Efficient chart updates.
+- Cleanup on component unmount.
+- Single shared real-time connection where architecture supports it.
+
+==================================================
+30. SECURITY
+==================================================
+
+Security requirements:
+
+NEVER expose:
+
+- MT5_PASSWORD.
+- MT5_ACCOUNT credentials beyond safe account display.
+- APP_SECRET_KEY.
+- JWT_SECRET_KEY.
+- API keys.
+- Database passwords.
+- Internal tokens.
+- Environment variables.
+
+Frontend source must contain no hardcoded credentials.
+
+Backend must validate all user actions.
+
+Frontend authorization is NOT a security boundary.
+
+==================================================
+31. ACCESSIBILITY
+==================================================
+
+Implement reasonable accessibility:
+
+- Keyboard navigation.
+- Visible focus states.
+- Accessible buttons.
+- Accessible form labels.
+- Tooltips where icons alone may be unclear.
+- Sufficient text contrast.
+- Semantic HTML where practical.
+
+==================================================
+32. CHART IMPLEMENTATION
+==================================================
+
+Use the existing charting dependency if one exists.
+
+If no chart library exists, choose a mature lightweight charting library suitable for financial candlestick charts.
+
+Do NOT introduce an unnecessarily heavy dependency.
+
+The chart must support:
+
+- Candlesticks.
+- Timeframes.
+- Zoom.
+- Scroll.
+- Crosshair.
+- Live updates.
+- Overlay layers.
+
+Do not implement technical/SMC calculations in the chart component.
+
+==================================================
+33. API INTEGRATION
+==================================================
+
+Create a clean frontend API client/service layer.
+
+Do NOT scatter raw fetch/HTTP calls throughout components.
+
+Centralize:
+
+- Base URL.
+- Authentication handling.
+- Error handling.
+- API types/interfaces.
+- Request utilities.
+
+Reuse existing backend endpoints wherever possible.
+
+Only create new backend endpoints where genuinely required by the Dashboard.
+
+Before creating a new endpoint:
+
+CHECK whether an existing endpoint already provides the required data.
+
+==================================================
+34. BACKEND EXTENSIONS
+==================================================
+
+If existing backend APIs do not expose required dashboard data:
+
+Add minimal API endpoints/services.
+
+Do not duplicate business logic.
+
+For example:
+
+GOOD:
+
+Dashboard
+→ `/api/v1/market/...`
+→ existing Market Scanner/Market Data service
+
+BAD:
+
+Dashboard
+→ new frontend-specific market calculation engine.
+
+Similarly:
+
+GOOD:
+
+Dashboard
+→ `/api/v1/signals/...`
+→ AI Engine
+
+BAD:
+
+Dashboard
+→ frontend calculates BUY/SELL.
+
+==================================================
+35. DATABASE
+==================================================
+
+Do not create duplicate database tables simply for the Dashboard.
+
+Reuse existing:
+
+- Trades.
+- News events.
+- Users.
+- Logs.
+- Settings.
+- Performance data.
+
+Only add database structures when absolutely necessary.
+
+If migrations are needed:
+
+- Use the existing migration system.
+- Make migrations safe.
+- Do not destroy existing data.
+- Keep migrations reversible where architecture supports it.
+
+==================================================
+36. TESTING
+==================================================
+
+Add/update tests for Section 11.
+
+At minimum test:
+
+1. Dashboard application loads.
+2. Authentication protection works.
+3. Market data rendering.
+4. No fake market data fallback.
+5. AI signal rendering.
+6. SMC rendering.
+7. Open trades rendering.
+8. Trade history rendering.
+9. News rendering.
+10. Notification rendering.
+11. Settings loading.
+12. Settings validation.
+13. API errors.
+14. Authentication expiry.
+15. WebSocket disconnect/reconnect.
+16. MT5 unavailable state.
+17. Empty state.
+18. Loading state.
+19. Sensitive secrets are never returned.
+20. Trade close confirmation/action uses backend API.
+21. SL/TP modification uses backend API.
+22. Responsive layout sanity where testing framework supports it.
+
+Do not weaken existing tests.
+
+Run:
+
+- Section 11 tests.
+- Existing full test suite.
+
+Fix regressions before completion.
+
+==================================================
+37. NO MOCK DATA IN PRODUCTION
+==================================================
+
+This is extremely important.
+
+Do NOT use fake/random:
+
+- Prices.
+- Candles.
+- Spreads.
+- Account balances.
+- P/L.
+- AI signals.
+- SMC values.
+- News events.
+- Trade data.
+
+For development/test environments, mocks may exist ONLY inside tests or clearly isolated test fixtures.
+
+Production UI must show unavailable states instead of fabricated data.
+
+==================================================
+38. EXISTING SECTION BOUNDARIES
+==================================================
+
+Preserve these responsibilities:
+
+Market Scanner:
+→ Market analysis.
+
+Indicators:
+→ Indicator calculations.
+
+SMC Engine:
+→ SMC calculations.
+
+AI Engine:
+→ BUY/SELL/NO TRADE decisions.
+
+Risk Manager:
+→ Risk approval/rejection.
+
+News Filter:
+→ News risk information.
+
+Trade Manager:
+→ Trade execution/management.
+
+MT5 Connector:
+→ Broker communication.
+
+Dashboard:
+→ Display + user controls only.
+
+Do not move business logic into the Dashboard.
+
+==================================================
+39. IMPORTANT MT5/LINUX RULE
+==================================================
+
+Replit/Linux cannot perform live MetaTrader5 Python operations.
+
+Therefore:
+
+On Linux/Replit:
+
+- Dashboard must gracefully show MT5 unavailable.
+- No fake live market data.
+- No fake connection status.
+- No fake trades.
+
+On Windows with MT5:
+
+- Backend can receive real MT5 data.
+- Dashboard should display the same backend data.
+
+The UI architecture must work in both environments.
+
+==================================================
+40. IMPLEMENTATION PROCESS
+==================================================
+
+Follow this exact process:
+
+PHASE 1:
+Inspect existing project.
+
+PHASE 2:
+Identify existing frontend/backend APIs and architecture.
+
+PHASE 3:
+Create implementation plan internally.
+
+PHASE 4:
+Implement Dashboard using existing architecture.
+
+PHASE 5:
+Implement missing API/data adapters only where necessary.
+
+PHASE 6:
+Implement real-time update mechanism using existing infrastructure or a minimal appropriate addition.
+
+PHASE 7:
+Implement all required pages/components.
+
+PHASE 8:
+Implement error/loading/empty/unavailable states.
+
+PHASE 9:
+Implement authentication and security integration.
+
+PHASE 10:
+Add tests.
+
+PHASE 11:
+Run Section 11 tests.
+
+PHASE 12:
+Run COMPLETE existing test suite.
+
+PHASE 13:
+Start the API/frontend and verify clean startup.
+
+PHASE 14:
+Fix all regressions.
+
+==================================================
+41. DO NOT DO THESE THINGS
+==================================================
+
+DO NOT:
+
+- Rewrite the whole project.
+- Replace existing backend architecture.
+- Replace existing frontend unnecessarily.
+- Remove existing modules.
+- Remove existing APIs.
+- Change Section 8 Risk Manager security gates.
+- Change Section 9 Trade Manager execution rules.
+- Change Section 10 News Filter business rules.
+- Add direct MT5 calls to frontend.
+- Add fake market data.
+- Add fake AI signals.
+- Add fake news.
+- Hardcode credentials.
+- Create a second authentication system.
+- Move AI/SMC/Risk calculations into frontend.
+- Automatically execute trades from dashboard display logic.
+- Add future features that are explicitly deferred.
+
+==================================================
+42. SECTION 11 ACCEPTANCE CRITERIA
+==================================================
+
+Section 11 is complete ONLY when:
+
+[ ] Professional Dashboard exists.
+[ ] Light theme is default.
+[ ] Dark theme works.
+[ ] Responsive layout works.
+[ ] Top bar exists.
+[ ] Sidebar navigation exists.
+[ ] Dashboard home exists.
+[ ] Market Watch exists.
+[ ] Live chart exists.
+[ ] Supported timeframes are available.
+[ ] Chart overlays use backend data.
+[ ] Market Scanner page exists.
+[ ] AI Signals page exists.
+[ ] SMC panel exists.
+[ ] Open Trades page exists.
+[ ] Trade History page exists.
+[ ] Account panel exists.
+[ ] Performance panel exists.
+[ ] News page exists.
+[ ] Notification center exists.
+[ ] Logs page exists.
+[ ] Settings page exists.
+[ ] Real-time data architecture exists.
+[ ] MT5 status is accurate.
+[ ] Exness/server status is accurate.
+[ ] Stale data is detected.
+[ ] Loading states exist.
+[ ] Empty states exist.
+[ ] Error states exist.
+[ ] MT5 unavailable state works.
+[ ] No fake production data exists.
+[ ] Existing authentication is reused.
+[ ] Secrets are never exposed.
+[ ] Dashboard cannot bypass Risk Manager.
+[ ] Dashboard cannot directly access MT5.
+[ ] Trade actions use existing Trade Manager APIs.
+[ ] Tests pass.
+[ ] Existing tests remain passing.
+[ ] Backend starts cleanly.
+[ ] Frontend starts cleanly.
+[ ] No critical console/runtime errors.
+
+==================================================
+43. FINAL REPORT
+==================================================
+
+After implementation, provide a concise completion report containing:
+
+1. Files created.
+2. Files modified.
+3. Existing architecture reused.
+4. New API endpoints, if any.
+5. New frontend routes/pages.
+6. Real-time architecture used.
+7. Authentication integration.
+8. Security protections.
+9. Tests added.
+10. Full test result.
+11. Frontend startup result.
+12. Backend startup result.
+13. Any limitations.
+14. Any items intentionally deferred.
+
+IMPORTANT:
+
+Do not claim "live MT5 data verified" on Replit/Linux.
+
+If live MT5 verification requires Windows, explicitly state that it remains a Windows verification step.
+
+==================================================
+FINAL RULE
+==================================================
+
+Implement SECTION 11 completely within the existing project.
+
+Preserve Sections 1–10.
+
+Do not redesign the system architecture.
+
+Do not invent functionality.
+
+Do not use fake production data.
+
+Do not weaken security.
+
+Do not stop after creating UI mockups.
+
+The result must be an actually integrated Dashboard connected to the existing backend modules and APIs.

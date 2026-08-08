@@ -1,119 +1,238 @@
-import { useGetTrades, useGetTradeStats } from "@workspace/api-client-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { formatCurrency, formatNumber, formatPercent, formatDate, cn } from "@/lib/utils";
+/**
+ * Open Trades page — live enriched open positions.
+ * Manual close goes through Trade Manager API (useDeleteTrade).
+ * SL/TP modification uses useUpdateTrade.
+ * No direct MT5 calls from frontend.
+ */
+
+import { useState } from "react";
+import { useGetTrades, useUpdateTrade, useDeleteTrade } from "@workspace/api-client-react";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { cn, formatCurrency, formatNumber } from "@/lib/utils";
+import { TrendingUp, TrendingDown, X, Edit2, AlertTriangle } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
+import { getGetTradesQueryKey } from "@workspace/api-client-react";
+
+function dirIcon(dir: string) {
+  return dir === "buy"
+    ? <TrendingUp  className="w-3.5 h-3.5 text-emerald-500" />
+    : <TrendingDown className="w-3.5 h-3.5 text-red-500"    />;
+}
+
+function pnlClass(pnl?: number | null) {
+  if (pnl === undefined || pnl === null) return "text-muted-foreground";
+  return pnl >= 0 ? "text-emerald-500" : "text-red-500";
+}
+
+function duration(opened?: string | null): string {
+  if (!opened) return "---";
+  const diff = (Date.now() - new Date(opened).getTime()) / 1000;
+  const h = Math.floor(diff / 3600);
+  const m = Math.floor((diff % 3600) / 60);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
 
 export default function TradesPage() {
-  const { data: tradesData, isLoading } = useGetTrades({ limit: 50 });
-  const { data: stats, isLoading: isStatsLoading } = useGetTradeStats();
+  const queryClient = useQueryClient();
+  const { data: paginated, isLoading } = useGetTrades({ status: "open", limit: 100 });
+  const trades = paginated?.items ?? [];
+
+  const deleteTrade = useDeleteTrade();
+  const updateTrade = useUpdateTrade();
+
+  const [closeId, setCloseId] = useState<string | null>(null);
+  const [editId,  setEditId]  = useState<string | null>(null);
+  const [editSl,  setEditSl]  = useState("");
+  const [editTp,  setEditTp]  = useState("");
+
+  const handleClose = async () => {
+    if (!closeId) return;
+    try {
+      await deleteTrade.mutateAsync({ id: closeId });
+      toast.success("Close request sent to Trade Manager.");
+      queryClient.invalidateQueries({ queryKey: getGetTradesQueryKey({ status: "open" }) });
+    } catch {
+      toast.error("Failed to close trade — backend error.");
+    } finally {
+      setCloseId(null);
+    }
+  };
+
+  const handleModify = async () => {
+    if (!editId) return;
+    const payload: any = {};
+    if (editSl) payload.stopLoss   = Number(editSl);
+    if (editTp) payload.takeProfit = Number(editTp);
+    if (!Object.keys(payload).length) { setEditId(null); return; }
+    try {
+      await updateTrade.mutateAsync({ id: editId, data: payload });
+      toast.success("SL/TP update sent to Trade Manager.");
+      queryClient.invalidateQueries({ queryKey: getGetTradesQueryKey({ status: "open" }) });
+    } catch {
+      toast.error("Failed to modify trade — backend error.");
+    } finally {
+      setEditId(null);
+      setEditSl("");
+      setEditTp("");
+    }
+  };
+
+  const openTrade = trades.find(t => t.id === editId);
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Trade History</h1>
-        <p className="text-muted-foreground mt-1 text-sm">Detailed log of all executed trades and outcomes.</p>
+        <h1 className="text-2xl font-bold tracking-tight">Open Trades</h1>
+        <p className="text-muted-foreground text-sm mt-0.5">Live positions managed by Trade Manager</p>
       </div>
 
-      {/* Stats Bar */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        {[
-          { label: "Total PnL", val: stats?.totalPnl !== undefined ? formatCurrency(stats.totalPnl) : "---", color: stats?.totalPnl && stats.totalPnl < 0 ? "text-red-500" : "text-emerald-500" },
-          { label: "Win Rate", val: stats?.winRate ? formatPercent(stats.winRate) : "---" },
-          { label: "Profit Factor", val: stats?.profitFactor ? formatNumber(stats.profitFactor) : "---" },
-          { label: "Avg R:R", val: stats?.avgRr ? formatNumber(stats.avgRr) : "---" },
-          { label: "Max Drawdown", val: stats?.maxDrawdown ? formatPercent(stats.maxDrawdown) : "---", color: "text-red-500" }
-        ].map((s, i) => (
-          <Card key={i} className="bg-card/50 backdrop-blur border-border/50">
-            <CardContent className="p-4 flex flex-col gap-1.5">
-              <span className="text-[10px] uppercase text-muted-foreground font-bold tracking-widest">{s.label}</span>
-              {isStatsLoading ? <Skeleton className="h-6 w-16" /> : (
-                <span className={cn("text-lg font-mono font-bold tracking-tight", s.color)}>{s.val}</span>
-              )}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <Card className="bg-card/50 backdrop-blur border-border/50 shadow-lg">
-        <div className="rounded-md overflow-hidden">
+      <Card className="bg-card/50 border-border/50 shadow-lg">
+        <CardHeader className="border-b border-border/50 pb-4">
+          <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-emerald-500" />
+            Active Positions ({isLoading ? "---" : trades.length})
+          </CardTitle>
+        </CardHeader>
+        <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow className="hover:bg-transparent bg-muted/30">
-                <TableHead className="w-[180px]">Time</TableHead>
-                <TableHead>Pair</TableHead>
-                <TableHead>Type</TableHead>
+              <TableRow className="bg-muted/30">
+                <TableHead className="pl-5">Pair</TableHead>
+                <TableHead>Dir</TableHead>
                 <TableHead>Entry</TableHead>
-                <TableHead>SL / TP</TableHead>
+                <TableHead className="text-red-400/70">SL</TableHead>
+                <TableHead className="text-emerald-400/70">TP</TableHead>
                 <TableHead>Lot</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Open Time</TableHead>
+                <TableHead>Duration</TableHead>
+                <TableHead>R:R</TableHead>
                 <TableHead className="text-right">PnL</TableHead>
+                <TableHead className="text-right pr-5">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                Array.from({length: 10}).map((_, i) => (
+                Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                    <TableCell><Skeleton className="h-6 w-12" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-                    <TableCell><Skeleton className="h-6 w-16" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
+                    {Array.from({ length: 11 }).map((_, j) => (
+                      <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
+                    ))}
                   </TableRow>
                 ))
-              ) : tradesData?.items.length === 0 ? (
+              ) : trades.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-32 text-center text-muted-foreground border-dashed">
-                    <span className="font-mono text-sm">NO_TRADES_FOUND</span>
+                  <TableCell colSpan={11} className="h-32 text-center text-muted-foreground">
+                    <div className="flex flex-col items-center gap-2 opacity-50">
+                      <AlertTriangle className="w-8 h-8" />
+                      <span className="font-mono text-sm font-bold tracking-widest">NO_OPEN_POSITIONS</span>
+                    </div>
                   </TableCell>
                 </TableRow>
-              ) : (
-                tradesData?.items.map((trade) => (
-                  <TableRow key={trade.id} className="group">
-                    <TableCell className="font-mono text-muted-foreground text-xs whitespace-nowrap">
-                      {formatDate(trade.createdAt)}
-                    </TableCell>
-                    <TableCell className="font-bold tracking-wide text-sm">{trade.pair}</TableCell>
-                    <TableCell>
-                      <Badge variant={trade.direction === "buy" ? "buy" : "sell"} className="px-2 text-[10px]">
-                        {trade.direction}
+              ) : trades.map(t => (
+                <TableRow key={t.id} className="hover:bg-muted/20 transition-colors">
+                  <TableCell className="pl-5 font-bold text-sm">{t.pair}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      {dirIcon(t.direction)}
+                      <Badge variant={t.direction === "buy" ? "buy" : "sell"}
+                        className="text-[9px] px-1.5 py-0.5 uppercase font-bold">
+                        {t.direction}
                       </Badge>
-                    </TableCell>
-                    <TableCell className="font-mono text-sm">{formatNumber(trade.entryPrice, 5)}</TableCell>
-                    <TableCell className="font-mono text-xs">
-                      <span className="text-red-400/80">{formatNumber(trade.stopLoss, 5)}</span>
-                      <span className="text-muted-foreground/30 mx-1">/</span>
-                      <span className="text-emerald-400/80">{formatNumber(trade.takeProfit, 5)}</span>
-                    </TableCell>
-                    <TableCell className="font-mono text-sm text-muted-foreground">{formatNumber(trade.lotSize, 2)}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={cn("px-2 text-[10px] font-bold border", 
-                        trade.status === "open" ? "text-blue-500 border-blue-500/30 bg-blue-500/10" :
-                        trade.status === "closed" ? "text-muted-foreground border-border bg-muted/20" : "text-muted-foreground opacity-50"
-                      )}>
-                        {trade.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {trade.pnl !== null && trade.pnl !== undefined ? (
-                        <span className={cn("font-mono font-bold text-sm tracking-tight", trade.pnl > 0 ? "text-emerald-500" : trade.pnl < 0 ? "text-red-500" : "")}>
-                          {trade.pnl > 0 ? "+" : ""}{formatCurrency(trade.pnl)}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground font-mono">---</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-mono text-xs">{t.entryPrice}</TableCell>
+                  <TableCell className="font-mono text-xs text-red-400">{t.stopLoss}</TableCell>
+                  <TableCell className="font-mono text-xs text-emerald-400">{t.takeProfit}</TableCell>
+                  <TableCell className="font-mono text-xs">{t.lotSize}</TableCell>
+                  <TableCell className="font-mono text-[11px] text-muted-foreground whitespace-nowrap">
+                    {t.openedAt ? new Date(t.openedAt).toLocaleString() : "---"}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">
+                    {duration(t.openedAt)}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">
+                    {t.riskRewardRatio ? `1:${formatNumber(t.riskRewardRatio)}` : "---"}
+                  </TableCell>
+                  <TableCell className={cn("text-right font-mono font-bold text-sm", pnlClass(t.pnl))}>
+                    {t.pnl !== null && t.pnl !== undefined ? formatCurrency(t.pnl) : "---"}
+                  </TableCell>
+                  <TableCell className="text-right pr-5">
+                    <div className="flex items-center gap-1.5 justify-end">
+                      <Button variant="outline" size="sm"
+                        onClick={() => { setEditId(t.id); setEditSl(String(t.stopLoss)); setEditTp(String(t.takeProfit)); }}
+                        className="h-7 w-7 p-0 border-border/50 hover:border-primary/50">
+                        <Edit2 className="w-3 h-3" />
+                      </Button>
+                      <Button variant="outline" size="sm"
+                        onClick={() => setCloseId(t.id)}
+                        className="h-7 w-7 p-0 border-red-500/30 hover:bg-red-500/10 hover:border-red-500/60">
+                        <X className="w-3 h-3 text-red-400" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </div>
       </Card>
+
+      {/* Close Confirmation Dialog */}
+      <AlertDialog open={!!closeId} onOpenChange={open => !open && setCloseId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Close Trade</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to close this position?
+              The close request will be sent to the Trade Manager → MT5 Connector → Exness.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleClose} className="bg-red-500 hover:bg-red-600">
+              Yes, Close Trade
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Edit SL/TP Dialog */}
+      <AlertDialog open={!!editId} onOpenChange={open => !open && setEditId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Modify SL / TP</AlertDialogTitle>
+            <AlertDialogDescription>
+              {openTrade && `Modifying ${openTrade.pair} ${openTrade.direction.toUpperCase()}. Changes go through Trade Manager.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="grid grid-cols-2 gap-4 py-2">
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Stop Loss</label>
+              <Input value={editSl} onChange={e => setEditSl(e.target.value)} type="number"
+                step="0.00001" className="font-mono text-sm border-red-500/30 focus:border-red-500" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Take Profit</label>
+              <Input value={editTp} onChange={e => setEditTp(e.target.value)} type="number"
+                step="0.00001" className="font-mono text-sm border-emerald-500/30 focus:border-emerald-500" />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleModify}>Apply Changes</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

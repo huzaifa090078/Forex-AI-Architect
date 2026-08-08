@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Hexagon, Lock } from "lucide-react";
 import { toast } from "sonner";
+import { setTokens } from "@/lib/auth";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -17,17 +18,21 @@ const loginSchema = z.object({
 export default function LoginPage() {
   const [, setLocation] = useLocation();
   const login = useAuthLogin();
-  
+
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema)
   });
 
   const onSubmit = async (data: z.infer<typeof loginSchema>) => {
     try {
-      await login.mutateAsync({ data });
+      const result = await login.mutateAsync({ data });
+      // Store tokens — never store password
+      if (result?.accessToken && result?.refreshToken) {
+        setTokens(result.accessToken, result.refreshToken);
+      }
       toast.success("Authenticated successfully");
       setLocation("/");
-    } catch (e) {
+    } catch {
       toast.error("Invalid credentials");
     }
   };
@@ -35,7 +40,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col justify-center items-center p-4 relative overflow-hidden">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-background to-background pointer-events-none" />
-      
+
       <div className="w-full max-w-md space-y-8 relative z-10 animate-in fade-in slide-in-from-bottom-8 duration-700">
         <div className="flex flex-col items-center text-center space-y-2">
           <div className="w-16 h-16 rounded-2xl bg-card border border-border/50 flex items-center justify-center mb-4 shadow-[0_0_30px_rgba(20,184,166,0.15)] relative overflow-hidden">
@@ -48,14 +53,14 @@ export default function LoginPage() {
 
         <div className="bg-card/50 backdrop-blur-xl border border-border/50 rounded-2xl p-8 shadow-2xl relative overflow-hidden group">
           <div className="absolute -inset-0.5 bg-gradient-to-br from-primary/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-          
+
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 relative z-10">
             <div className="space-y-3">
               <Label className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground">Operator ID (Email)</Label>
               <Input type="email" {...register("email")} className="h-12 bg-background/50 font-mono text-sm focus:border-primary transition-colors border-border/50" placeholder="operator@nexus.ai" />
               {errors.email && <p className="text-[10px] text-red-500">{errors.email.message}</p>}
             </div>
-            
+
             <div className="space-y-3">
               <Label className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground">Access Key (Password)</Label>
               <Input type="password" {...register("password")} className="h-12 bg-background/50 font-mono text-sm focus:border-primary transition-colors border-border/50" placeholder="••••••••" />
@@ -70,7 +75,7 @@ export default function LoginPage() {
 
           <div className="mt-8 text-center relative z-10 pt-6 border-t border-border/30">
             <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-mono">
-              Unregistered Operator? <Link href="/auth/register" className="text-primary hover:underline ml-2 font-bold">Request Access</Link>
+              Unregistered? <Link href="/auth/register" className="text-primary hover:underline ml-2 font-bold">Request Access</Link>
             </p>
           </div>
         </div>

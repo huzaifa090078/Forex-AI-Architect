@@ -39,10 +39,13 @@ def create_app() -> FastAPI:
     )
 
     # ── CORS ────────────────────────────────────────────────────────────────
+    # In development (Replit), the proxy origin can vary; allow all.
+    # In production, set ALLOWED_ORIGINS to your explicit domains.
+    allow_all = settings.APP_ENV == "development" or settings.ALLOWED_ORIGINS == ["*"]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.ALLOWED_ORIGINS,
-        allow_credentials=True,
+        allow_origins=["*"] if allow_all else settings.ALLOWED_ORIGINS,
+        allow_credentials=False if allow_all else True,   # credentials+wildcard disallowed by spec
         allow_methods=["*"],
         allow_headers=["*"],
     )
