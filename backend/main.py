@@ -2,17 +2,22 @@
 AI Forex Trading Bot — FastAPI Application Entry Point
 """
 
+import logging
 import os
 
+import sqlalchemy as sa
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.core.config import settings
-from app.core.database import engine, Base
+from app.core.database import engine, Base, AsyncSessionLocal
 from app.modules.market_scanner.live_feed import market_data_feed
 from app.modules.market_scanner.scanner import market_scanner as _market_scanner
+from app.modules.trade_manager.monitor import trade_monitor
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Application factory
@@ -69,25 +74,49 @@ def create_app() -> FastAPI:
 
     @app.on_event("startup")
     async def on_startup() -> None:
-        # Create all tables (dev convenience — use Alembic in production)
+        # ── Schema bootstrap (dev convenience; use Alembic in production) ──
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+            # Section 9: idempotently add close_price / close_reason columns
+            # to existing DBs that pre-date the migration.
+            await conn.execute(
+                sa.text(
+                    "ALTER TABLE trades "
+                    "ADD COLUMN IF NOT EXISTS close_price FLOAT"
+                )
+            )
+            await conn.execute(
+                sa.text(
+                    "ALTER TABLE trades "
+                    "ADD COLUMN IF NOT EXISTS close_reason VARCHAR(100)"
+                )
+            )
 
-        # Start the Section 3 live market-data feed (tick polling + candle
-        # detection).  The feed connects to MT5/Exness on first data request;
-        # on non-Windows platforms the connector raises RuntimeError which the
-        # feed catches and logs as a warning, so startup is never blocked.
+        # ── Ensure system bot user exists ────────────────────────────────────
+        from app.modules.trade_manager.service import TradeService
+        try:
+            async with AsyncSessionLocal() as db:
+                await TradeService.ensure_bot_user(db)
+        except Exception as exc:
+            logger.warning("Startup: could not create bot user: %s", exc)
+
+        # ── Live market-data feed (Section 3) ────────────────────────────────
+        # Connects to MT5/Exness on first data request; raises RuntimeError on
+        # non-Windows which the feed catches and logs as a warning.
         await market_data_feed.start()
 
         # Wire the scanner to the candle feed — every completed candle
         # automatically triggers a fresh scan for the affected pair.
-        # Uses the existing subscribe_candles() infrastructure; no polling loop.
         market_data_feed.subscribe_candles(_on_candle)
+
+        # ── Trade position monitoring (Section 9) ────────────────────────────
+        await trade_monitor.start()
 
     @app.on_event("shutdown")
     async def on_shutdown() -> None:
-        # Stop the live feed before the event loop closes so background tasks
-        # can finish cleanly without CancelledError noise in the logs.
+        # Stop the trade monitor before the event loop closes.
+        await trade_monitor.stop()
+        # Stop the live feed and dispose of the DB engine.
         await market_data_feed.stop()
         await engine.dispose()
 

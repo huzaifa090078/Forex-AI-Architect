@@ -74,6 +74,10 @@ class Trade(Base):
     # Broker reference
     broker_order_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
+    # Close details (populated when trade is closed)
+    close_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    close_reason: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+
     opened_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

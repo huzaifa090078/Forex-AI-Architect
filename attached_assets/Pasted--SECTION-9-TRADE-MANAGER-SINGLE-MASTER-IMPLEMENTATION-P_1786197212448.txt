@@ -1,0 +1,507 @@
+# SECTION 9 — TRADE MANAGER
+
+## SINGLE MASTER IMPLEMENTATION PROMPT
+
+Implement **Section 9 — Trade Manager** completely in the existing project.
+
+### CRITICAL WORKING RULES
+
+1. First inspect the existing Trade Manager, MT5 Connector, Risk Manager, database models/schemas, API router, configuration, and application lifecycle **internally as part of this single task**.
+2. Do NOT perform a separate audit-only phase and stop.
+3. Reuse existing architecture, interfaces, types, connector methods, Risk Manager approval mechanism, database infrastructure, and API conventions wherever they already exist.
+4. Do NOT recreate functionality that already exists.
+5. Do NOT replace working architecture unnecessarily.
+6. Make the **minimum surgical changes** required to complete Section 9.
+7. Do NOT modify Sections 1–8 unless a strictly necessary compatibility change is required for Trade Manager integration. If such a change is necessary, keep it minimal and report it.
+8. Do NOT implement future features listed below.
+9. Trade Manager must remain an **execution layer only**. It must never make trading decisions, generate strategy signals, calculate risk independently, or bypass Risk Manager approval.
+10. Do not use fake, mock, simulated, demo, or hardcoded broker data in production code.
+11. All real execution must go through the existing MT5/Exness connector abstraction.
+12. Fail safely: if broker connectivity, symbol data, order validation, or Risk Approval is unavailable, do not execute the order.
+13. Do not expose secrets or credentials.
+14. Preserve all existing APIs and behaviour unless Section 9 explicitly requires an extension.
+15. Keep the implementation production-ready, async-safe, maintainable, and consistent with the existing project style.
+
+---
+
+# SECTION 9 REQUIREMENTS
+
+## 9.1 Purpose
+
+Trade Manager must:
+
+* Receive approved trades.
+* Execute approved Market Buy/Sell orders through the MT5 Connector → Exness.
+* Monitor open trades.
+* Manage SL/TP.
+* Close trades.
+* Maintain trade execution/history state.
+* Report execution failures safely.
+
+Trade Manager itself must NOT decide whether a trade is strategically good.
+
+---
+
+# 9.2 Required Workflow
+
+Implement this execution boundary:
+
+AI Engine
+→ Risk Manager
+→ Trade Manager
+→ MT5 Connector
+→ Exness
+
+The Trade Manager must only execute a trade when it has a **valid Risk Manager approval**.
+
+The existing Section 8 RiskApproval mechanism is authoritative.
+
+Do NOT create a second risk approval mechanism.
+
+---
+
+# 9.3 Trade Execution
+
+Version 1 supports ONLY:
+
+* Market Buy
+* Market Sell
+
+Do NOT implement:
+
+* Pending orders
+* Limit orders
+* Stop orders
+
+Trade Manager must accept the existing approved order structure where possible.
+
+Before execution verify:
+
+* Risk approval exists.
+* Risk approval is approved.
+* Risk approval matches the exact order parameters.
+* MT5 connector is available.
+* Symbol is available.
+* Market/order execution is possible.
+* Volume is valid.
+* Required prices are valid.
+* SL/TP are valid.
+* Spread/execution constraints are still acceptable where broker data makes this possible.
+
+If any mandatory validation fails:
+
+**DO NOT SEND THE ORDER TO THE BROKER.**
+
+Return a structured failure result and log the reason.
+
+---
+
+# 9.4 Broker Order Placement
+
+Use the existing MT5 Connector abstraction.
+
+Do NOT call the MetaTrader/MT5 library directly from Trade Manager if the project architecture already provides a connector abstraction.
+
+The broker request must contain, as supported by the existing connector:
+
+* Symbol
+* BUY/SELL direction
+* Volume
+* Market execution price/current price
+* Stop Loss
+* Take Profit
+* Bot/trade comment or identifier
+
+Use the project's existing magic number/comment conventions if they already exist.
+
+Do not invent a second broker integration.
+
+---
+
+# 9.5 Order Confirmation
+
+After broker execution, capture the broker response.
+
+Trade execution result should preserve, where available:
+
+* Order ID
+* Position/Ticket number
+* Execution price
+* Execution time
+* Requested volume
+* Executed volume
+* Status
+* Broker return/error code
+* Broker error message
+
+Do not report an order as successfully executed merely because the request was sent.
+
+Success must depend on the actual broker response.
+
+---
+
+# 9.6 Trade Persistence
+
+Inspect the existing database models/repositories first.
+
+If the project already has a trade/order persistence model, reuse it.
+
+If Section 9 persistence is genuinely missing, add the minimum required model/repository/schema needed to store:
+
+* Ticket number
+* Symbol
+* Direction
+* Entry price
+* Exit price
+* SL
+* TP
+* Lot size
+* Profit/Loss
+* Open time
+* Close time
+* Trade duration
+* Status
+* Close reason
+* Broker/order identifiers
+* Error information where applicable
+
+Do NOT create duplicate trade tables if an existing model already serves this purpose.
+
+Follow the project's existing database migration/model conventions.
+
+---
+
+# 9.7 Open Trade Monitoring
+
+Implement monitoring for broker positions belonging to this bot.
+
+Monitor:
+
+* Current price
+* Current P/L
+* Distance to SL
+* Distance to TP
+* Trade duration
+* Position status
+
+Monitoring must use real broker/MT5 data through the existing connector.
+
+Do not create a second independent market-data implementation.
+
+The monitoring loop must be asynchronous and must not block the event loop.
+
+---
+
+# 9.8 Stop Loss Management
+
+Version 1 must support:
+
+* Existing/fixed SL
+* Manual SL update
+* Break-even
+
+Implement break-even only if there is sufficient existing architecture/configuration to do so cleanly.
+
+Do NOT implement advanced trailing stop.
+
+Future only:
+
+* Trailing Stop
+
+If the existing project has no explicit break-even configuration, do not invent complex strategy rules. Keep the management API/service ready for it without introducing unsupported behaviour.
+
+---
+
+# 9.9 Take Profit Management
+
+Support:
+
+* Fixed TP
+* Manual TP modification
+
+Do NOT implement:
+
+* Dynamic TP
+
+Dynamic TP remains future scope.
+
+---
+
+# 9.10 Trade Closing
+
+Support:
+
+* Broker-triggered TP/SL detection through position synchronization
+* Manual close
+* Emergency stop
+
+Do NOT implement AI Exit Signal logic in this section because it is explicitly future scope.
+
+Every close should capture:
+
+* Exit price
+* Close time
+* Realized P/L
+* Close reason
+* Broker response/status
+
+---
+
+# 9.11 Failed Orders
+
+Handle and persist/log broker failures including:
+
+* Invalid volume
+* Market closed
+* No connection
+* Trade disabled
+* Invalid symbol
+* Invalid stops
+* Broker rejection
+* Execution failure
+* Timeout/communication failure
+
+Never swallow broker errors silently.
+
+Return a structured failure result containing a safe human-readable reason.
+
+Do not expose credentials or sensitive broker information.
+
+---
+
+# 9.12 Duplicate Trade Protection
+
+Inspect existing configuration and architecture for duplicate-trade rules.
+
+Implement configurable protection for:
+
+* Same symbol already has an open trade.
+* Same symbol + same direction already has an open trade.
+
+Reuse existing `max_open_trades` / Risk Manager controls where applicable.
+
+Do not duplicate Risk Manager logic unnecessarily.
+
+If the existing architecture already defines the authoritative duplicate rule, use it rather than creating a conflicting rule.
+
+---
+
+# 9.13 Position Synchronization
+
+Trade Manager must be able to recover broker state after:
+
+* Application restart
+* MT5 restart
+* Temporary connection loss
+
+On startup/reconnect:
+
+1. Query broker positions through MT5 Connector.
+2. Identify positions belonging to this bot.
+3. Synchronize local Trade Manager state.
+4. Continue monitoring synchronized positions.
+
+Do not assume local memory is authoritative.
+
+Broker state is authoritative for currently open positions.
+
+---
+
+# 9.14 Dashboard/API
+
+Inspect the existing API conventions first.
+
+If Trade Manager API endpoints are missing, add the minimum required endpoints for:
+
+* Open trades
+* Trade details
+* Manual close
+* Manual SL update
+* Manual TP update
+* Trade execution result/status
+
+Use the existing authentication and API response conventions.
+
+Do NOT create a second authentication mechanism.
+
+Do NOT expose broker credentials.
+
+Use camelCase serialization if that is the existing API convention.
+
+---
+
+# 9.15 Trade Manager Output
+
+Trade information exposed to the API/dashboard should support:
+
+* Ticket ID
+* Symbol/pair
+* Direction
+* Entry price
+* Current price
+* SL
+* TP
+* Lot size
+* Profit/Loss
+* Status
+* Open time
+* Duration
+* Close reason when closed
+
+Use existing project schemas where possible.
+
+---
+
+# 9.16 Application Lifecycle
+
+If Trade Manager requires a monitoring worker:
+
+* Start it through the existing application lifecycle.
+* Stop it cleanly during application shutdown.
+* Do not create unmanaged background tasks.
+* Avoid duplicate monitoring loops.
+* Handle cancellation correctly.
+* Do not block startup/shutdown.
+
+---
+
+# 9.17 Risk Manager Security Boundary
+
+This is mandatory.
+
+Trade Manager MUST NOT be able to execute an order without valid Risk Manager approval.
+
+The execution path must reject:
+
+* Missing RiskApproval
+* `approved=False`
+* Expired/stale approval if the existing approval mechanism supports expiry
+* Symbol mismatch
+* Direction mismatch
+* Entry mismatch
+* SL mismatch
+* TP mismatch
+* Lot-size mismatch
+
+Do not weaken the Section 8 security boundary.
+
+The broker execution call must occur **after** this validation.
+
+---
+
+# 9.18 Architecture Requirements
+
+Maintain this responsibility separation:
+
+### AI Engine
+
+Decision/signal generation.
+
+### Risk Manager
+
+Risk validation and final approval.
+
+### Trade Manager
+
+Execution and position management.
+
+### MT5 Connector
+
+Broker communication.
+
+Trade Manager must not:
+
+* Generate strategy signals.
+* Decide BUY/SELL independently.
+* Calculate strategic risk independently.
+* Bypass Risk Manager.
+* Directly manipulate broker libraries when connector abstraction exists.
+
+---
+
+# 9.19 Future Features — DO NOT IMPLEMENT
+
+Explicitly leave these for future sections:
+
+* Pending orders
+* Partial close
+* Scale in
+* Scale out
+* Multi-TP
+* Smart trailing stop
+* Auto re-entry
+* AI exit signals
+* Advanced hedging
+* Advanced portfolio execution logic
+
+Do not add speculative implementations just to mark requirements as complete.
+
+---
+
+# IMPLEMENTATION PROCESS
+
+Work continuously in this single task.
+
+1. Inspect existing relevant files.
+2. Identify reusable architecture.
+3. Implement only missing Section 9 functionality.
+4. Update interfaces/types only where necessary.
+5. Update persistence only where necessary.
+6. Update API only where necessary.
+7. Wire Trade Manager into application lifecycle only where necessary.
+8. Add focused tests.
+9. Run the existing full test suite.
+10. Fix regressions.
+11. Verify that Sections 1–8 remain intact.
+12. Verify that no fake/mock/demo broker implementation was introduced.
+
+Do NOT stop after inspection and ask for approval.
+
+---
+
+# REQUIRED VERIFICATION
+
+Before finishing, verify at minimum:
+
+* Existing tests pass.
+* New Trade Manager tests pass.
+* Missing RiskApproval blocks execution.
+* Rejected RiskApproval blocks execution.
+* Mismatched RiskApproval blocks execution.
+* Valid approval reaches broker connector.
+* BUY execution works through connector abstraction.
+* SELL execution works through connector abstraction.
+* Broker rejection is handled correctly.
+* Invalid volume is rejected.
+* Invalid symbol is rejected.
+* Open positions synchronize correctly.
+* Manual close works through connector.
+* SL modification works.
+* TP modification works.
+* Duplicate protection works according to configuration.
+* Monitoring task starts/stops cleanly.
+* Application startup has no import/runtime errors.
+* Application shutdown cancels monitoring cleanly.
+* Existing Section 8 tests still pass.
+* No protected Section 1–8 functionality is unintentionally changed.
+
+If MT5/Exness cannot be exercised on Replit/Linux, do NOT fake the broker response. Instead test the connector boundary with deterministic test doubles/mocks **only inside tests**, and clearly report which tests require a real Windows MT5 terminal.
+
+---
+
+# FINAL REPORT
+
+When implementation is complete, provide:
+
+1. Section 9 completion percentage.
+2. Files created.
+3. Files modified.
+4. Existing functionality reused.
+5. Requirements completed.
+6. Any genuinely deferred requirement and why.
+7. Tests passed/failed/skipped.
+8. Confirmation that RiskApproval cannot be bypassed.
+9. Confirmation that Sections 1–8 were not unintentionally changed.
+10. Any real platform limitation such as Windows MT5 availability.
+
+Do not claim 100% unless every applicable Section 9 requirement is actually implemented and verified.

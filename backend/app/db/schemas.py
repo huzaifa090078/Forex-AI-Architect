@@ -74,12 +74,52 @@ class TradeOut(BaseModel):
     lot_size: float
     status: str
     pnl: Optional[float] = None
+    close_price: Optional[float] = None
+    close_reason: Optional[str] = None
     risk_reward_ratio: Optional[float] = None
     notes: Optional[str] = None
+    broker_order_id: Optional[str] = None
     signal_id: Optional[str] = None
     opened_at: Optional[datetime] = None
     closed_at: Optional[datetime] = None
     created_at: datetime
+
+
+class OpenTradeOut(BaseModel):
+    """Live enriched open trade — includes current broker price/PnL where available."""
+    id: str
+    pair: str
+    direction: str
+    entry_price: float
+    current_price: Optional[float] = None
+    stop_loss: float
+    take_profit: float
+    lot_size: float
+    pnl: Optional[float] = None
+    status: str
+    opened_at: Optional[datetime] = None
+    duration_seconds: Optional[int] = None
+    broker_ticket: Optional[str] = None
+    sl_distance_pips: Optional[float] = None
+    tp_distance_pips: Optional[float] = None
+    risk_reward_ratio: Optional[float] = None
+
+
+class ManualCloseIn(BaseModel):
+    reason: str = "manual"
+
+
+class ModifySlTpIn(BaseModel):
+    stop_loss: Optional[float] = None
+    take_profit: Optional[float] = None
+
+
+class TradeExecutionResultOut(BaseModel):
+    success: bool
+    broker_order_id: Optional[str] = None
+    fill_price: Optional[float] = None
+    fill_time: Optional[datetime] = None
+    error_message: Optional[str] = None
 
 
 class TradeInput(BaseModel):

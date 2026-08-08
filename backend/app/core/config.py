@@ -129,6 +129,20 @@ class Settings(BaseSettings):
     # Maximum lots allocated to a single currency (base or quote) across all positions.
     RISK_MAX_CURRENCY_EXPOSURE_LOTS: float = Field(default=2.0)
 
+    # ── Trade Manager (Section 9) ─────────────────────────────────────────────
+    # Comment prefix stamped on every broker order so the bot can identify its own positions.
+    TRADE_BOT_COMMENT_PREFIX: str = Field(default="AIBot")
+    # How often (seconds) the monitoring loop syncs open positions with the broker.
+    TRADE_MONITOR_INTERVAL_SECONDS: int = Field(default=30)
+    # Block a new trade if the same symbol already has any open position (any direction).
+    TRADE_PREVENT_DUPLICATE_SYMBOL: bool = Field(default=False)
+    # Block a new trade if the same symbol + same direction already has an open position.
+    TRADE_PREVENT_DUPLICATE_DIRECTION: bool = Field(default=True)
+    # Stable UUID used as the system bot user-id for all bot-executed trades.
+    TRADE_BOT_USER_ID: str = Field(default="00000000-0000-0000-0000-000000000001")
+    # Email for the auto-created system bot user (must be unique in the users table).
+    TRADE_BOT_EMAIL: str = Field(default="bot@system.local")
+
     # ── Backtesting ──────────────────────────────────────────────────────────
     BACKTEST_DATA_PATH: str = Field(default="./data/historical")
     BACKTEST_WORKERS: int = Field(default=4)
