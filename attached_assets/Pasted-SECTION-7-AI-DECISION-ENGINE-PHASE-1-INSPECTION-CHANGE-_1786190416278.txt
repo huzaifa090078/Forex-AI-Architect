@@ -1,0 +1,269 @@
+SECTION 7 — AI DECISION ENGINE
+PHASE 1: INSPECTION + CHANGE PLAN ONLY
+
+We are now implementing Section 7 — AI Decision Engine.
+
+IMPORTANT:
+- DO NOT write or modify any code yet.
+- DO NOT create files yet.
+- First inspect the complete existing project architecture.
+- Section 1–6 are already implemented and verified.
+- Preserve the existing architecture and functionality.
+- Do NOT implement live order execution.
+- Do NOT connect AI Engine directly to MT5 for order placement.
+- Do NOT add machine learning/deep learning/reinforcement learning in this version.
+- Version 1 must be deterministic Rule-Based + Technical Confluence + SMC.
+- AI Engine produces a decision/signal only.
+- Risk Manager will validate the decision later.
+- Do not invent APIs, classes, fields, or existing functionality.
+
+SECTION 7 REQUIREMENTS
+
+The AI Decision Engine combines:
+
+1. Market Scanner
+   - pair
+   - timeframe
+   - trend
+   - volatility
+   - volume
+   - session
+   - spread
+
+2. Technical Indicators
+   - EMA
+   - SMA
+   - RSI
+   - MACD
+   - ATR
+   - Bollinger Bands
+   - VWAP
+   - ADX
+   - Stochastic RSI
+   - Volume Analysis
+
+3. SMC
+   - BOS
+   - CHoCH
+   - Order Block
+   - Liquidity
+   - Liquidity Sweep
+   - FVG
+   - Supply
+   - Demand
+   - Premium / Discount
+   - Market Structure
+   - Confluence
+
+4. Market Conditions
+   - live price
+   - live candle
+   - spread
+   - tick data
+
+DECISIONS
+
+The engine must produce exactly one of:
+
+- BUY
+- SELL
+- NO_TRADE
+
+Do not introduce additional decision states unless the existing architecture requires one.
+
+CONFIDENCE
+
+Every decision must contain a confidence score.
+
+Version 1 minimum confidence threshold:
+- Use 80% as the default threshold unless the existing project already defines a different configuration pattern.
+- Do not hard-code the threshold if the project has an appropriate configuration/settings architecture.
+- Confidence below the threshold must result in NO_TRADE.
+
+CONFLUENCE
+
+The engine must not make a decision from one indicator alone.
+
+The decision should consider agreement between:
+
+- trend
+- SMC
+- technical indicators
+- spread
+- session
+- volatility
+- market conditions
+
+TRADE QUALITY
+
+The engine should classify setup quality as:
+
+- Excellent
+- Good
+- Average
+- Weak
+- Reject
+
+Only sufficiently strong setups should be forwarded as actionable decisions.
+
+ENTRY
+
+The engine may produce:
+
+- current entry price
+- suggested entry zone when waiting for a better entry is preferable
+
+STOP LOSS
+
+The engine may produce a suggested SL candidate/zone.
+
+This is NOT the final SL.
+
+Risk Manager will validate/finalize it later.
+
+TAKE PROFIT
+
+The engine may produce suggested TP candidate levels.
+
+These are NOT final TP levels.
+
+Risk Manager will validate them later.
+
+REJECTION CONDITIONS
+
+The engine should reject a setup when applicable:
+
+- trend is unclear
+- SMC conflicts with direction
+- technical indicators materially conflict
+- spread is too high
+- volatility is unsuitable
+- confidence is below threshold
+
+IMPORTANT:
+Do not invent arbitrary numerical spread/volatility/session thresholds during implementation.
+First inspect existing configuration and risk-related architecture.
+If a required threshold does not exist, identify it as a design decision in the Change Plan instead of silently inventing it.
+
+CONTINUOUS MONITORING
+
+The architecture should allow a future/current signal to be recalculated when market conditions change.
+
+For an unexecuted signal, the decision may change from BUY/SELL to NO_TRADE when the setup becomes invalid.
+
+Do not implement trade cancellation or order modification because execution is out of scope.
+
+DASHBOARD OUTPUT
+
+The AI decision output should be capable of representing:
+
+- pair
+- timeframe
+- BUY / SELL / NO_TRADE
+- confidence %
+- trade quality
+- trend
+- SMC summary
+- indicators summary
+- suggested entry
+- suggested entry zone if applicable
+- suggested SL
+- suggested TP
+- timestamp
+
+ARCHITECTURAL REQUIREMENTS
+
+Before proposing implementation, inspect:
+
+- existing backend directory structure
+- interfaces/protocols
+- db schemas
+- MarketScanner
+- indicator engine
+- SMC engine
+- MarketDataService
+- MT5 integration
+- existing Risk Manager, if present
+- existing Trade Manager, if present
+- API/router architecture
+- configuration/settings
+- existing dashboard/API output models
+- existing tests
+- naming conventions
+- logging/error-handling patterns
+
+Determine:
+
+1. Which existing classes/modules can be reused.
+2. Which existing data structures already contain the required inputs.
+3. Which fields are missing.
+4. Whether a new AI interface is required.
+5. Where the AI Engine should live in the existing module architecture.
+6. How the engine should receive Scanner/Indicator/SMC data.
+7. How the engine should return a typed decision.
+8. How the output should later connect to Risk Manager without coupling execution logic into AI Engine.
+9. Which thresholds already exist and which are genuinely missing.
+10. What tests are required.
+
+CRITICAL DESIGN RULE
+
+Do NOT create an artificial "AI" that simply calculates a random or arbitrary confidence number.
+
+Confidence must be derived deterministically from the actual available confluence inputs.
+
+Also do not claim that a rule-based engine is machine-learning AI.
+Call it the AI Decision Engine because that is the system module defined by the project, but implement Version 1 as deterministic rule-based confluence logic.
+
+SAFETY / EXECUTION BOUNDARY
+
+The AI Engine must NOT:
+
+- send orders
+- modify orders
+- close positions
+- calculate actual position size
+- bypass Risk Manager
+- directly execute trades through MT5
+
+The intended flow is:
+
+Market Scanner
+    ↓
+Technical Indicators
+    ↓
+SMC Engine
+    ↓
+AI Decision Engine
+    ↓
+Risk Manager
+    ↓
+[future execution layer]
+
+For this phase, stop at AI Decision Engine output.
+
+DELIVERABLE
+
+After inspecting the project, provide ONLY a detailed Change Plan.
+
+The Change Plan must include:
+
+1. Existing architecture relevant to Section 7
+2. Files that will be modified
+3. New files that will be created
+4. Files that will NOT be modified
+5. Exact classes/functions/models to add or modify
+6. Input/output contracts
+7. Deterministic confidence calculation design
+8. Confluence scoring design
+9. BUY/SELL/NO_TRADE decision rules
+10. Trade-quality classification rules
+11. Entry/SL/TP candidate generation design
+12. Threshold/configuration handling
+13. Error handling and graceful degradation
+14. API/dashboard integration plan
+15. Risk Manager integration boundary
+16. Test plan
+17. Potential risks or ambiguities
+18. Any requirement that needs my approval before implementation
+
+Do not implement anything until I explicitly approve the Change Plan.
