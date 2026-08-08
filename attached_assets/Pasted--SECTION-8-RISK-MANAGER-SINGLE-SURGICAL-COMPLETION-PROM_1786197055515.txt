@@ -1,0 +1,363 @@
+# SECTION 8 — RISK MANAGER
+
+## SINGLE SURGICAL COMPLETION PROMPT
+
+You are completing **Section 8 — Risk Manager** of the existing trading-bot project.
+
+### CRITICAL RULES
+
+1. **Do NOT perform a broad read-only audit first.**
+2. The Section 8 implementation already exists. **Inspect only the minimum relevant files needed to understand the current implementation and fix remaining gaps.**
+3. **Do NOT rebuild working functionality.**
+4. **Do NOT change architecture unnecessarily.**
+5. Preserve all existing functionality from Sections 1–7.
+6. Do not modify protected modules unless a direct Section 8 integration requires it.
+7. Do not touch SMC, Indicators, AI Engine, Market Scanner, Auth, Backtesting, or other completed sections unnecessarily.
+8. Do not invent APIs, broker behaviour, or data.
+9. Risk Manager must be **fail-closed**: if required broker/risk/news/session information cannot be verified, the trade must be rejected rather than approved.
+10. Section 8.18 is the critical security boundary:
+    **Trade Manager must never execute an order without a valid Risk Manager approval.**
+11. Correlation Protection is explicitly **future scope** and must NOT be invented or implemented unless existing architecture already supports it.
+12. Daily-stat persistence can remain in-memory if database persistence is not part of the current project section.
+13. News provider integration can remain dependent on the existing News Filter interface if the real provider belongs to a later section.
+14. Work continuously in one pass. Do not stop after an audit and ask for approval.
+15. Use the minimum number of agent/tool actions possible while still validating correctness.
+
+---
+
+# SECTION 8 REQUIREMENTS
+
+Implement/complete these requirements:
+
+### 8.1 Purpose
+
+Risk Manager must:
+
+* calculate risk
+* calculate lot size
+* validate SL
+* validate TP
+* validate Risk/Reward
+* monitor daily loss
+* prevent overtrading
+
+### 8.2 Workflow
+
+AI Decision Engine
+→ Risk Manager
+→ Trade Manager
+
+No trade may reach broker execution without Risk Manager approval.
+
+### 8.3 Risk Per Trade
+
+Respect configured user risk percentage.
+
+Examples:
+
+* 0.5%
+* 1%
+* 2%
+
+Never approve risk above the configured maximum.
+
+### 8.4 Automatic Lot Size
+
+Calculate lot size using:
+
+* account balance/equity
+* configured risk %
+* SL distance
+* pip/tick value
+* symbol specifications
+* broker volume min/max/step
+
+Normalize the result to broker-supported volume constraints.
+
+Never exceed the calculated monetary risk budget.
+
+### 8.5 Stop Loss Validation
+
+Validate:
+
+* correct direction
+* SL is actually on the protective side of entry
+* SL distance is valid
+* maximum SL distance if configured
+* reject invalid/missing SL
+
+Where Section 8 architecture has reliable SMC/structure information available, validate structural placement without inventing unavailable data.
+
+### 8.6 Take Profit Validation
+
+Validate:
+
+* TP is on the correct side of entry
+* TP is valid for direction
+* TP produces acceptable reward
+* reject invalid/missing TP
+
+Use available structure/liquidity information only if it already exists and can be consumed safely.
+
+### 8.7 Risk/Reward
+
+Calculate:
+
+reward / risk
+
+Reject if below configured minimum.
+
+Default minimum may remain the existing project value if already implemented.
+
+Handle floating-point boundary safely.
+
+### 8.8 Maximum Open Trades
+
+Respect configured maximum open trades.
+
+If the limit is reached:
+→ reject new trade.
+
+### 8.9 Maximum Daily Loss
+
+Track daily loss.
+
+When configured daily loss limit is reached:
+→ reject new trades.
+
+Existing positions may continue to be monitored.
+
+Daily statistics must reset correctly at the start of a new trading day.
+
+### 8.10 Maximum Daily Profit
+
+If configured/enabled:
+→ stop approving new trades after the target is reached.
+
+If disabled:
+→ do not block trading.
+
+### 8.11 Drawdown Protection
+
+Monitor:
+
+* current drawdown
+* configured maximum drawdown
+
+If limit is crossed:
+→ trading paused/rejected.
+
+### 8.12 Consecutive Loss Protection
+
+Track consecutive losing trades.
+
+If configured limit is reached:
+→ reject new trades until protection resets according to the existing design.
+
+### 8.13 Spread Protection
+
+Read current spread from the broker/data layer.
+
+If spread exceeds configured maximum:
+→ reject trade.
+
+### 8.14 Session Protection
+
+Use the project's existing session utility if available.
+
+If allowed sessions are configured:
+→ approve only during allowed sessions.
+
+If no sessions are configured:
+→ all sessions remain allowed.
+
+### 8.15 News Protection
+
+Use the existing News Filter interface.
+
+If high-impact news blocks trading:
+→ reject trade.
+
+If news status cannot safely be determined and the architecture defines fail-closed behaviour:
+→ reject trade.
+
+Do not invent a news provider here if the real provider belongs to a later section.
+
+### 8.16 Correlation Protection
+
+**Future scope.**
+
+Do not implement fake correlation logic.
+
+Keep the architecture extensible for future correlation controls.
+
+### 8.17 Exposure Control
+
+Monitor:
+
+* total open exposure
+* currency exposure
+* relevant account exposure limits
+
+Reject trades exceeding configured limits.
+
+### 8.18 Final Trade Validation
+
+Before approval, verify all applicable checks:
+
+* AI approval/input valid
+* confidence requirements if already supplied by upstream
+* SMC requirements if already supplied by upstream
+* risk %
+* lot size
+* SL
+* TP
+* RR
+* spread
+* session
+* news
+* maximum open trades
+* daily loss
+* daily profit if enabled
+* drawdown
+* consecutive losses
+* exposure
+
+If any required check fails:
+
+**REJECT TRADE.**
+
+### 8.19 Dashboard/API Output
+
+Expose the existing Risk Manager state/approval information through the project's established API conventions.
+
+At minimum, support:
+
+* risk %
+* lot size
+* RR
+* SL
+* TP
+* expected loss
+* expected profit
+* daily risk used
+* daily loss
+* drawdown
+* protection state
+
+Use the project's existing camelCase API serialization convention.
+
+### 8.20 Trade Manager Security Boundary
+
+This is mandatory.
+
+`TradeManager.open_trade()` must reject execution when:
+
+* no RiskApproval is supplied
+* approval is rejected
+* approval is expired/invalid if expiry exists
+* symbol differs
+* direction differs
+* entry differs
+* SL differs
+* TP differs
+* lot size differs
+
+The approval must be bound to the exact approved order parameters so a caller cannot obtain approval for one trade and execute another.
+
+---
+
+# IMPLEMENTATION PROCEDURE
+
+1. Inspect the existing Section 8 implementation and only the directly connected interfaces.
+2. Identify genuine missing/incorrect requirements.
+3. Modify only what is necessary.
+4. Reuse existing:
+
+   * `IRiskManager`
+   * `RiskParameters`
+   * `PositionSize`
+   * `RiskCheckResult`
+   * existing MT5 connector interfaces
+   * existing News Filter interface
+   * existing session utility
+   * existing Trade Manager architecture
+   * existing API/schema conventions
+5. Keep fail-closed behaviour.
+6. Do not duplicate existing utilities.
+7. Do not create unnecessary new files.
+8. Do not change completed sections.
+9. Add/update focused tests only where required to prove the missing behaviour.
+10. Run:
+
+* syntax/compile checks
+* lint checks available in the project
+* focused Risk Manager tests
+* full existing test suite if reasonably available
+* API import/startup verification
+
+11. If MT5 cannot run on Replit/Linux, do not fake broker results. Clearly distinguish environment limitations from implementation failures.
+
+---
+
+# ACCEPTANCE CRITERIA
+
+Section 8 is complete only when:
+
+* Risk percentage is enforced.
+* Lot size is correctly calculated and broker-normalized.
+* SL validation works.
+* TP validation works.
+* RR minimum is enforced.
+* Maximum open trades is enforced.
+* Daily loss protection works.
+* Optional daily profit protection works.
+* Drawdown protection works.
+* Consecutive-loss protection works.
+* Spread protection works.
+* Session protection works.
+* News Filter is respected through the existing interface.
+* Exposure limits work.
+* Risk approval is fail-closed.
+* Trade Manager cannot bypass Risk Manager.
+* Approval is bound to the exact order parameters.
+* API output follows existing project conventions.
+* No fake/mock trading data is introduced.
+* Existing Sections 1–7 remain intact.
+* Existing tests continue passing.
+
+---
+
+# FINAL RESPONSE FORMAT
+
+After implementation, report only:
+
+### SECTION 8 — COMPLETION REPORT
+
+**Status:** COMPLETE / INCOMPLETE
+
+**Files created:**
+List only genuinely new files.
+
+**Files modified:**
+List only modified files and one-line reason.
+
+**Requirements completed:**
+Give a concise checklist against Sections 8.1–8.20.
+
+**Security boundary:**
+Confirm whether Trade Manager can execute without valid RiskApproval.
+
+**Tests:**
+
+* focused tests: X passed / X failed
+* full suite: X passed / X failed / X skipped
+* startup/import check: PASS/FAIL
+
+**Deferred by specification:**
+Only mention explicitly future-scope items such as Correlation Protection or later News Provider integration.
+
+**Protected sections:**
+Confirm Sections 1–7 were not unnecessarily modified.
+
+Do not claim 100% completion if any required Section 8 requirement is genuinely missing.
