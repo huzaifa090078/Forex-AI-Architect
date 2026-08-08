@@ -10,7 +10,7 @@ name = "API Server"
 paths = ["/api"]
 
 [services.development]
-run = "cd backend && pip install -r requirements.txt -q && python main.py"
+run = "cd ../../backend && pip install -r requirements.txt -q && python main.py"
 
 [services.production]
 
