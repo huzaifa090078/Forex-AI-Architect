@@ -7,13 +7,14 @@ specific AI framework in use.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from app.modules.ai_engine.types import (
     OHLCV,
     FeatureVector,
     SignalCandidate,
     ModelMetadata,
+    TradeDecision,
 )
 
 
@@ -72,6 +73,7 @@ class IAIEngine(ABC):
     """
     Top-level AI Engine facade.
     Orchestrates: feature extraction → model inference → signal filtering.
+    Reserved for future ML inference; preserved as-is from the ML scaffold.
     """
 
     @abstractmethod
@@ -85,5 +87,40 @@ class IAIEngine(ABC):
         """
         Full pipeline: extract features, run inference, filter, return signals.
         This is the primary entry point called by the Market Scanner.
+        """
+        ...
+
+
+# ── Section 7: Rule-Based Decision Engine interface ───────────────────────────
+# Distinct from IAIEngine (ML scaffold above). IDecisionEngine receives
+# fully pre-computed inputs from the API orchestration layer and returns
+# a single TradeDecision. It never calls SMCAnalyzer, IndicatorSuite, MT5,
+# Risk Manager, or any data source.
+
+class IDecisionEngine(ABC):
+    """
+    Rule-based confluence decision interface.
+
+    The API layer is responsible for fetching data and pre-computing all
+    inputs (ScanResult, indicators, MTFAnalysis, ConfluenceResult).
+    The engine evaluates those inputs deterministically and returns one
+    TradeDecision per call. Same inputs → same output every time.
+    """
+
+    @abstractmethod
+    async def evaluate(
+        self,
+        scan_result: "ScanResult",         # type: ignore[name-defined]
+        indicators:  Dict[str, Any],       # Dict[str, IndicatorResult]
+        mtf:         Optional[Any],        # Optional[MTFAnalysis]
+        confluence:  Optional[Any],        # Optional[ConfluenceResult]
+        ohlcv:       List[Dict[str, Any]], # primary-timeframe bars (for future use)
+    ) -> TradeDecision:
+        """
+        Derive a TradeDecision from fully pre-computed inputs.
+
+        Must never call SMCAnalyzer, IndicatorSuite, MarketDataService,
+        Risk Manager, Trade Manager, or any MT5 connector.
+        All inputs are provided by the caller.
         """
         ...

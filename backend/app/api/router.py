@@ -15,6 +15,7 @@ from app.api.v1.news import router as news_router
 from app.api.v1.settings import router as settings_router
 from app.api.v1.logs import router as logs_router
 from app.api.v1.smc import router as smc_router
+from app.api.v1.ai import router as ai_router
 
 api_router = APIRouter()
 
@@ -36,3 +37,4 @@ api_router.include_router(news_router,       prefix="/v1/news",       tags=["new
 api_router.include_router(settings_router,   prefix="/v1/settings",   tags=["settings"])
 api_router.include_router(logs_router,       prefix="/v1/logs",       tags=["logs"])
 api_router.include_router(smc_router,        prefix="/v1/smc",        tags=["smc"])
+api_router.include_router(ai_router,         prefix="/v1/ai",         tags=["ai"])

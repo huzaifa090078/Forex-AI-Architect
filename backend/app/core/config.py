@@ -68,10 +68,19 @@ class Settings(BaseSettings):
     # Base delay (seconds) for the first reconnect attempt; doubles each retry.
     MT5_RECONNECT_DELAY_SECONDS: float = Field(default=2.0)
 
-    # ── AI Engine ────────────────────────────────────────────────────────────
+    # ── AI Engine (ML scaffold — future use) ─────────────────────────────────
     AI_MODEL_PATH: str = Field(default="./models")
     AI_MIN_CONFIDENCE: float = Field(default=0.75)
     AI_INFERENCE_DEVICE: str = Field(default="cpu")
+
+    # ── AI Engine (rule-based decision engine) ────────────────────────────────
+    # Maximum spread in pips before the engine rejects a setup as NO_TRADE.
+    # Mirrors the scanner's internal _MAX_SPREAD_PIPS = 3.0 constant.
+    AI_MAX_SPREAD_PIPS: float = Field(default=3.0)
+    # When True, High-volatility setups (ATR% > 0.10) are penalised and rejected.
+    AI_VOLATILITY_FILTER_ENABLED: bool = Field(default=False)
+    # Session names the engine considers tradeable. Empty list = all sessions.
+    AI_TRADEABLE_SESSIONS: List[str] = Field(default=[])
 
     # ── Market Data ──────────────────────────────────────────────────────────
     MARKET_SCAN_INTERVAL_SECONDS: int = Field(default=60)

@@ -343,6 +343,65 @@ class ConfluenceFactorOut(BaseModel):
     reason:    str
 
 
+# ─── AI Decision Engine ───────────────────────────────────────────────────────
+
+class IndicatorSummaryOut(BaseModel):
+    """
+    Compact per-indicator result included in TradeDecisionOut.
+    ``value`` may be a scalar float or a nested dict (e.g. MACD histogram dict).
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    name:   str
+    signal: Optional[str] = None         # "buy" | "sell" | "neutral" | None
+    value:  Any                           # scalar or dict
+    status: str                           # "active" | "warmup" | "unavailable"
+
+
+class SMCSummaryOut(BaseModel):
+    """Compact SMC analysis summary embedded in TradeDecisionOut."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    bias:                   str
+    alignment_score:        float     = Field(alias="alignmentScore")
+    confluence_score:       int       = Field(alias="confluenceScore")
+    dominant_timeframe:     str       = Field(alias="dominantTimeframe")
+    confirmed_factors:      List[str] = Field(alias="confirmedFactors")
+    conflicting_timeframes: List[str] = Field(alias="conflictingTimeframes")
+
+
+class TradeDecisionOut(BaseModel):
+    """
+    Response schema for a single AI Decision Engine evaluation result.
+
+    BUY / SELL / NO_TRADE is returned for every evaluation request.
+    ``rejectionReasons`` is non-empty whenever action == "no_trade".
+    ``stopLoss``, ``takeProfit1``, ``takeProfit2`` are *candidate* values;
+    the Risk Manager finalises them in a later section.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    pair:               str
+    timeframe:          str
+    action:             str                            # "buy" | "sell" | "no_trade"
+    confidence:         float                          # 0.0 – 1.0
+    trade_quality:      str   = Field(alias="tradeQuality")
+    trend:              str
+    smc_summary:        Optional[SMCSummaryOut] = Field(default=None, alias="smcSummary")
+    indicators_summary: List[IndicatorSummaryOut] = Field(
+        default_factory=list, alias="indicatorsSummary"
+    )
+    entry_price:        Optional[float] = Field(default=None, alias="entryPrice")
+    entry_zone_low:     Optional[float] = Field(default=None, alias="entryZoneLow")
+    entry_zone_high:    Optional[float] = Field(default=None, alias="entryZoneHigh")
+    stop_loss:          Optional[float] = Field(default=None, alias="stopLoss")
+    take_profit_1:      Optional[float] = Field(default=None, alias="takeProfit1")
+    take_profit_2:      Optional[float] = Field(default=None, alias="takeProfit2")
+    rejection_reasons:  List[str]       = Field(default_factory=list, alias="rejectionReasons")
+    evaluated_at:       datetime        = Field(alias="evaluatedAt")
+    metadata:           Dict[str, Any]  = Field(default_factory=dict)
+
+
 class ConfluenceResultOut(BaseModel):
     """
     Response schema for the normalized 0–100 SMC confluence score for a pair.
