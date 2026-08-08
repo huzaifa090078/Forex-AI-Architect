@@ -535,6 +535,34 @@ class RealMT5Connector(IMT5Connector):
     # RealMT5Connector — infrastructure / health
     # ------------------------------------------------------------------
 
+    async def get_symbol_info(self, symbol: str) -> Dict[str, Any]:
+        """
+        Fetch symbol specification from MT5 via mt5.symbol_info().
+
+        Required by the Risk Manager for accurate lot sizing.
+        Raises RuntimeError if the symbol is unavailable or MT5 is not connected.
+        """
+        _require_mt5()
+
+        info = await self._run(mt5.symbol_info, symbol)
+        if info is None:
+            error = await self._run(mt5.last_error)
+            raise RuntimeError(
+                f"mt5.symbol_info('{symbol}') returned None: {error}. "
+                "The symbol may be unavailable or not visible in Market Watch."
+            )
+
+        return {
+            "tick_size":     float(info.trade_tick_size),
+            "tick_value":    float(info.trade_tick_value),
+            "contract_size": float(info.trade_contract_size),
+            "volume_min":    float(info.volume_min),
+            "volume_max":    float(info.volume_max),
+            "volume_step":   float(info.volume_step),
+            "digits":        int(info.digits),
+            "point":         float(info.point),
+        }
+
     async def check_symbols(self, symbols: List[str]) -> Dict[str, bool]:
         """
         Check whether each symbol in `symbols` is available in the MT5 terminal.

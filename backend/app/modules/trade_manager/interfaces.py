@@ -7,21 +7,34 @@ It delegates broker communication to the MT5 Integration module and
 pre-flight checks to the Risk Manager.
 """
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+if TYPE_CHECKING:
+    from app.modules.risk_manager.types import RiskApproval
 
 
 @dataclass
 class OrderRequest:
-    """A validated, risk-approved trade ready to be sent to the broker."""
+    """
+    A risk-approved trade request ready to be sent to the broker.
+
+    ``risk_approval`` must be populated by a RuleBasedRiskManager.approve_trade()
+    call before open_trade() is invoked.  Trade Manager validates the approval
+    against all execution parameters before placing any order — bypassing the
+    Risk Manager is structurally impossible through this interface.
+    """
     pair: str
     direction: str                       # "buy" | "sell"
     entry_price: float
     stop_loss: float
     take_profit: float
     lot_size: float
+    risk_approval: Optional["RiskApproval"] = None   # REQUIRED before execution
     signal_id: Optional[str] = None
     notes: str = ""
     metadata: Dict[str, Any] = field(default_factory=dict)

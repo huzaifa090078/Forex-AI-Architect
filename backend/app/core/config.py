@@ -93,10 +93,41 @@ class Settings(BaseSettings):
     NEWS_HIGH_IMPACT_BLOCK_MINUTES: int = Field(default=30)
 
     # ── Risk Management ──────────────────────────────────────────────────────
+    # (Section 8 — RuleBasedRiskManager)
     RISK_PER_TRADE_PERCENT: float = Field(default=1.0)
     MAX_OPEN_TRADES: int = Field(default=5)
     MAX_DAILY_LOSS_PERCENT: float = Field(default=5.0)
     DEFAULT_LOT_SIZE: float = Field(default=0.01)
+
+    # Minimum reward:risk ratio required for trade approval (e.g. 2.0 = 1:2)
+    RISK_MIN_RR: float = Field(default=2.0)
+
+    # Optional daily profit target; 0.0 = disabled (default).
+    # When enabled and reached, new trades are blocked for the remainder of the day.
+    RISK_MAX_DAILY_PROFIT_PERCENT: float = Field(default=0.0)
+
+    # Maximum allowable drawdown from the day-open equity (%).
+    RISK_MAX_DRAWDOWN_PERCENT: float = Field(default=10.0)
+
+    # Number of consecutive losing trades that triggers a trading block.
+    RISK_MAX_CONSECUTIVE_LOSSES: int = Field(default=3)
+
+    # Maximum spread in pips allowed by the Risk Manager (independent of AI engine limit).
+    RISK_MAX_SPREAD_PIPS: float = Field(default=3.0)
+
+    # Maximum stop-loss distance in pips; 0.0 = unlimited.
+    RISK_MAX_SL_PIPS: float = Field(default=0.0)
+
+    # Allowed trading sessions for the Risk Manager.
+    # Empty list = all sessions permitted.  Values: "London", "New York",
+    # "London/NY Overlap", "Asian", "Off Hours".
+    RISK_ALLOWED_SESSIONS: List[str] = Field(default=[])
+
+    # Maximum total open lots across all positions before new trades are blocked.
+    RISK_MAX_TOTAL_OPEN_LOTS: float = Field(default=5.0)
+
+    # Maximum lots allocated to a single currency (base or quote) across all positions.
+    RISK_MAX_CURRENCY_EXPOSURE_LOTS: float = Field(default=2.0)
 
     # ── Backtesting ──────────────────────────────────────────────────────────
     BACKTEST_DATA_PATH: str = Field(default="./data/historical")

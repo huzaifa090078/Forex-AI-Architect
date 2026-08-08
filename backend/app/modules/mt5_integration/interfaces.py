@@ -138,3 +138,25 @@ class IMT5Connector(ABC):
             "tick_time" — datetime (UTC timestamp of the tick)
         """
         ...
+
+    @abstractmethod
+    async def get_symbol_info(self, symbol: str) -> Dict[str, Any]:
+        """
+        Fetch symbol specification from MT5 via mt5.symbol_info().
+
+        Required by the Risk Manager for accurate lot sizing — no hardcoded
+        pip values are permitted; all values must come from the broker.
+
+        Returns a dict with keys:
+            "tick_size"     — float  (minimum price movement, e.g. 0.00001)
+            "tick_value"    — float  (monetary value of 1 tick per 1 lot)
+            "contract_size" — float  (units per lot, e.g. 100_000)
+            "volume_min"    — float  (minimum lot size)
+            "volume_max"    — float  (maximum lot size)
+            "volume_step"   — float  (lot increment step)
+            "digits"        — int    (decimal places in price quotes)
+            "point"         — float  (point size = tick_size for most forex)
+
+        Raises RuntimeError if the symbol is unavailable or MT5 is disconnected.
+        """
+        ...

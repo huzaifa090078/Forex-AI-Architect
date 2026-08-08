@@ -402,6 +402,104 @@ class TradeDecisionOut(BaseModel):
     metadata:           Dict[str, Any]  = Field(default_factory=dict)
 
 
+# ─── Risk Manager (Section 8) ─────────────────────────────────────────────────
+
+class ProtectionStateOut(BaseModel):
+    """Current active protection states exposed through the dashboard API."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    daily_loss_active:        bool  = Field(alias="dailyLossActive")
+    daily_profit_active:      bool  = Field(alias="dailyProfitActive")
+    drawdown_active:          bool  = Field(alias="drawdownActive")
+    consecutive_loss_active:  bool  = Field(alias="consecutiveLossActive")
+    max_open_trades_active:   bool  = Field(alias="maxOpenTradesActive")
+    session_blocked:          bool  = Field(alias="sessionBlocked")
+    news_blocked:             bool  = Field(alias="newsBlocked")
+    spread_blocked:           bool  = Field(alias="spreadBlocked")
+    exposure_blocked:         bool  = Field(alias="exposureBlocked")
+    any_active:               bool  = Field(alias="anyActive")
+
+    daily_pnl:               float = Field(alias="dailyPnl")
+    daily_pnl_pct:           float = Field(alias="dailyPnlPct")
+    drawdown_pct:            float = Field(alias="drawdownPct")
+    consecutive_losses:      int   = Field(alias="consecutiveLosses")
+    open_trades:             int   = Field(alias="openTrades")
+
+
+class RiskApprovalOut(BaseModel):
+    """
+    Response schema for a RuleBasedRiskManager.approve_trade() result.
+
+    ``approved`` is True only when every mandatory Section 8 check passed.
+    ``rejectionReasons`` lists all failures when approved=False.
+    ``lotSize`` and ``riskAmount`` are 0.0 when rejected.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    approved:           bool
+    pair:               str
+    direction:          str
+    entry:              float
+    stop_loss:          float   = Field(alias="stopLoss")
+    take_profit:        float   = Field(alias="takeProfit")
+    lot_size:           float   = Field(alias="lotSize")
+    risk_amount:        float   = Field(alias="riskAmount")
+    risk_pct:           float   = Field(alias="riskPct")
+    rr_ratio:           float   = Field(alias="rrRatio")
+    rejection_reasons:  List[str] = Field(alias="rejectionReasons")
+    protection_flags:   List[str] = Field(alias="protectionFlags")
+    approved_at:        datetime  = Field(alias="approvedAt")
+
+
+class RiskStateOut(BaseModel):
+    """
+    Full Risk Manager dashboard state: configuration + protection + limits.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    # Configuration
+    risk_per_trade_pct:            float     = Field(alias="riskPerTradePct")
+    min_rr:                        float     = Field(alias="minRr")
+    max_open_trades:               int       = Field(alias="maxOpenTrades")
+    max_daily_loss_pct:            float     = Field(alias="maxDailyLossPct")
+    max_daily_profit_pct:          float     = Field(alias="maxDailyProfitPct")
+    max_drawdown_pct:              float     = Field(alias="maxDrawdownPct")
+    max_consecutive_losses:        int       = Field(alias="maxConsecutiveLosses")
+    max_spread_pips:               float     = Field(alias="maxSpreadPips")
+    allowed_sessions:              List[str] = Field(alias="allowedSessions")
+    max_total_open_lots:           float     = Field(alias="maxTotalOpenLots")
+    max_currency_exposure_lots:    float     = Field(alias="maxCurrencyExposureLots")
+
+    # Live protection state
+    protection:                    ProtectionStateOut
+
+
+class RiskApprovalIn(BaseModel):
+    """Request body for the pre-flight risk check endpoint."""
+    pair:        str
+    direction:   str     # "buy" | "sell"
+    entry:       float
+    stop_loss:   float
+    take_profit: float
+
+
+class RecordTradeCloseIn(BaseModel):
+    """Request body for recording a closed trade P&L."""
+    trade_id: str
+    pnl:      float
+
+
+class PositionSizeOut(BaseModel):
+    """Computed position size output (legacy compute_position_size path)."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    lot_size:          float = Field(alias="lotSize")
+    risk_amount:       float = Field(alias="riskAmount")
+    pip_value:         float = Field(alias="pipValue")
+    stop_loss_pips:    float = Field(alias="stopLossPips")
+    risk_reward_ratio: float = Field(alias="riskRewardRatio")
+
+
 class ConfluenceResultOut(BaseModel):
     """
     Response schema for the normalized 0–100 SMC confluence score for a pair.

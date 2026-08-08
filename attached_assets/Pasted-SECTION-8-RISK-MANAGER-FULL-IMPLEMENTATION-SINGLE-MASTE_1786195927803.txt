@@ -1,0 +1,558 @@
+SECTION 8 — RISK MANAGER
+FULL IMPLEMENTATION — SINGLE MASTER TASK
+
+We are now implementing ONLY SECTION 8 — Risk Manager.
+
+IMPORTANT:
+Use the minimum number of agent/tool actions possible.
+Do NOT perform a separate read-only audit and stop.
+First inspect the existing project internally, then immediately implement all missing Section 8 functionality in this same task.
+Do not ask for approval between inspection and implementation.
+
+ARCHITECTURE RULE:
+Treat the existing project as one connected system.
+Before changing anything, inspect the existing Risk Manager, AI Engine, SMC Engine, Trade Manager, News Filter, Market Data Engine, database models/schemas, config, APIs, and tests so you do not duplicate existing functionality.
+
+Preserve existing architecture and functionality.
+Do not rewrite working modules unnecessarily.
+Do not create duplicate risk/lot-size/RR logic if equivalent functionality already exists.
+Move or centralize logic only when necessary to make Risk Manager the single source of truth.
+
+==================================================
+SECTION 8 — REQUIREMENTS
+==================================================
+
+Risk Manager is the account-protection layer between AI Decision Engine and Trade Manager.
+
+Required workflow:
+
+AI Decision Engine
+        ↓
+Risk Manager
+        ↓
+Trade Manager
+
+Trade Manager must not execute a trade unless Risk Manager has approved it.
+
+--------------------------------------------------
+8.1 RISK PER TRADE
+--------------------------------------------------
+
+Implement configurable maximum risk per trade.
+
+Examples:
+- 0.5%
+- 1%
+- 2%
+
+Requirements:
+- Risk percentage must come from configuration/user settings.
+- Requested risk must never exceed configured maximum.
+- Invalid/negative/zero risk values must be rejected.
+- Calculate actual monetary risk from account equity/balance as appropriate.
+- Use MT5/Exness symbol/account information, not fake/demo market data.
+
+--------------------------------------------------
+8.2 AUTOMATIC LOT SIZE
+--------------------------------------------------
+
+Implement production-safe lot sizing using:
+
+- Account balance/equity
+- Risk %
+- Entry price
+- Stop Loss
+- Stop-loss distance
+- Tick size
+- Tick value
+- Contract/symbol specifications
+- Minimum volume
+- Maximum volume
+- Volume step
+
+The calculation must work with actual MT5 symbol specifications.
+
+Requirements:
+- Correctly normalize lot size to broker volume step.
+- Respect min/max volume.
+- Never return negative, zero, NaN, or infinite volume.
+- Do not exceed configured monetary risk after normalization.
+- Handle invalid/missing symbol specifications safely.
+- Avoid hardcoded pip values where MT5 tick specifications provide the correct data.
+
+--------------------------------------------------
+8.3 STOP LOSS VALIDATION
+--------------------------------------------------
+
+Validate AI/SMC-provided SL before approval.
+
+Checks should include where data is available:
+
+- SL exists
+- SL is on the correct side of entry
+- SL is not zero/invalid
+- Minimum SL distance
+- Maximum SL distance
+- Current market price relationship
+- Market structure
+- Order Block relationship
+- Liquidity relationship
+
+Do not invent SMC data.
+If SMC context is unavailable, use the existing interfaces/state and mark that validation as unavailable rather than fabricating approval.
+
+--------------------------------------------------
+8.4 TAKE PROFIT VALIDATION
+--------------------------------------------------
+
+Validate TP.
+
+Checks:
+- TP exists
+- TP is on the correct side of entry
+- TP is valid relative to entry
+- Market structure where available
+- Liquidity target where available
+- Supply/Demand where available
+- RR calculation
+
+Do not invent liquidity or SMC levels.
+
+--------------------------------------------------
+8.5 RISK / REWARD
+--------------------------------------------------
+
+Implement configurable minimum RR.
+
+Examples:
+- 1:2
+- 1:2.5
+- 1:3
+
+Calculate RR from actual entry, SL and TP.
+
+Reject trade when:
+
+RR < configured minimum.
+
+Handle invalid distances safely.
+
+--------------------------------------------------
+8.6 MAXIMUM OPEN TRADES
+--------------------------------------------------
+
+Implement configurable maximum open trades.
+
+Before approval:
+- Read actual currently open positions/orders from MT5/Trade Manager infrastructure.
+- Reject new trade when configured limit is reached.
+
+Do not count fake/demo positions.
+
+--------------------------------------------------
+8.7 MAXIMUM DAILY LOSS
+--------------------------------------------------
+
+Implement configurable daily-loss protection.
+
+Track the trading day's realized loss and relevant floating loss according to the existing account/trade architecture.
+
+When configured daily loss limit is reached:
+- Block new trades.
+- Existing trades are NOT automatically closed unless existing architecture explicitly requires it.
+- Keep protection active until the next trading day.
+
+Daily reset must be deterministic and timezone-aware.
+
+Do not rely only on process memory if the project already has persistent account/trade state available.
+
+--------------------------------------------------
+8.8 MAXIMUM DAILY PROFIT
+--------------------------------------------------
+
+Implement optional configurable daily-profit protection.
+
+If enabled and target is reached:
+- Block new trades.
+
+Existing trades remain untouched unless another protection rule requires action.
+
+--------------------------------------------------
+8.9 DRAWDOWN PROTECTION
+--------------------------------------------------
+
+Monitor:
+- Current drawdown
+- Floating drawdown
+- Maximum drawdown
+
+Use actual account equity/balance.
+
+If configured drawdown limit is exceeded:
+- Block new trades.
+- Produce a clear protection/rejection reason.
+- Expose protection state for dashboard/API if existing architecture supports it.
+
+Do not silently approve trades while protection is active.
+
+--------------------------------------------------
+8.10 CONSECUTIVE LOSS PROTECTION
+--------------------------------------------------
+
+Implement configurable consecutive-loss limit.
+
+When the limit is reached:
+- Block new trades.
+- Track/reset correctly after a winning/qualifying trade according to the existing trade history model.
+- Avoid counting the same closed trade more than once.
+
+If there is no suitable persistence currently available, implement a clean persistence-compatible state mechanism rather than an uncontrolled global variable.
+
+--------------------------------------------------
+8.11 SPREAD PROTECTION
+--------------------------------------------------
+
+Validate current spread before approval.
+
+Requirements:
+- Read real MT5/Exness tick data.
+- Compare spread against configurable maximum.
+- Reject trade if spread is too high.
+- Handle missing/invalid tick data safely.
+
+Do not use external market-data providers.
+
+--------------------------------------------------
+8.12 SESSION PROTECTION
+--------------------------------------------------
+
+Implement configurable allowed trading sessions:
+
+- London
+- New York
+- London + New York
+- Asian optional
+
+Session calculations must use an explicit timezone strategy and must handle UTC correctly.
+
+If current session is not allowed:
+- Reject new trade.
+
+Do not hardcode behavior that conflicts with configurable settings.
+
+--------------------------------------------------
+8.13 NEWS PROTECTION
+--------------------------------------------------
+
+Integrate with the existing News Filter interface/module.
+
+If high-impact news protection is active:
+- Reject/pause new trade according to existing project configuration/interface.
+
+Do not create a fake news source.
+
+If News Filter is not yet operational, fail safely rather than assuming news is clear.
+
+--------------------------------------------------
+8.14 EXPOSURE CONTROL
+--------------------------------------------------
+
+Implement available exposure controls using existing account/position data.
+
+Monitor where possible:
+- Total open risk
+- Currency exposure
+- USD exposure
+- EUR exposure
+- Other currencies represented by open positions
+
+Add configurable limits where appropriate.
+
+Do not create fake correlation calculations.
+
+--------------------------------------------------
+8.15 CORRELATION PROTECTION
+--------------------------------------------------
+
+Correlation protection is FUTURE scope.
+
+DO NOT build a new correlation engine in Section 8.
+
+Only integrate with an existing correlation interface if one already exists.
+
+Otherwise document it as deferred.
+
+--------------------------------------------------
+8.16 FINAL TRADE VALIDATION
+--------------------------------------------------
+
+Create ONE centralized Risk Manager approval path.
+
+A proposed trade should pass all applicable mandatory checks:
+
+- AI approval
+- Confidence threshold
+- SMC state/context where available
+- Risk %
+- Lot size
+- SL
+- TP
+- RR
+- Maximum open trades
+- Daily loss
+- Daily profit if enabled
+- Drawdown
+- Consecutive losses
+- Spread
+- Session
+- News
+- Exposure
+
+If any mandatory check fails:
+
+TRADE REJECTED.
+
+The result must contain:
+- approved/rejected
+- rejection reasons
+- calculated lot size
+- calculated risk amount
+- risk %
+- RR
+- entry
+- SL
+- TP
+- relevant protection states
+
+Do not use a collection of unrelated approval functions that can disagree with each other. The final decision must have one authoritative path.
+
+--------------------------------------------------
+8.17 TRADE MANAGER INTEGRATION
+--------------------------------------------------
+
+Integrate Risk Manager with the existing Trade Manager through existing interfaces where possible.
+
+Trade Manager must be unable to execute a proposed trade unless the Risk Manager approval is valid.
+
+Do NOT rewrite Trade Manager unnecessarily.
+
+Do NOT add a second execution path.
+
+Protect against:
+- bypassing Risk Manager
+- stale approval
+- approval for different symbol/side/entry/SL/TP
+- changed lot size after approval
+
+If the existing architecture already has an approval token/object, reuse it.
+
+Otherwise create a small immutable approval result/context that Trade Manager can validate before execution.
+
+--------------------------------------------------
+8.18 DASHBOARD/API OUTPUT
+--------------------------------------------------
+
+Expose Risk Manager state through the existing API architecture where appropriate.
+
+Required information:
+
+- Risk %
+- Lot Size
+- RR Ratio
+- SL
+- TP
+- Expected Loss
+- Expected Profit
+- Daily Risk Used
+- Daily Loss
+- Drawdown
+- Protection state
+- Approval/rejection reason
+
+Follow existing Pydantic/schema/serialization conventions.
+
+Do not redesign unrelated dashboard endpoints.
+
+--------------------------------------------------
+8.19 CONFIGURATION
+--------------------------------------------------
+
+Add only the necessary configurable settings.
+
+At minimum support configuration for:
+
+- max risk per trade
+- minimum RR
+- maximum open trades
+- maximum daily loss
+- optional maximum daily profit
+- maximum drawdown
+- consecutive loss limit
+- maximum spread
+- allowed sessions
+- news protection
+- exposure limits where required
+
+Use the project's existing Settings/config architecture.
+
+Provide safe production defaults.
+
+Do not hardcode user-specific risk settings inside business logic.
+
+--------------------------------------------------
+8.20 ERROR HANDLING & SAFETY
+--------------------------------------------------
+
+Risk Manager is a safety-critical module.
+
+Fail CLOSED.
+
+If required information is unavailable or invalid:
+- Reject the trade.
+
+Examples:
+- Account data unavailable → reject
+- Symbol specification unavailable → reject
+- Tick unavailable → reject when spread validation is required
+- Invalid SL/TP → reject
+- Risk calculation failure → reject
+- News status unavailable while news protection is required → reject
+- Unknown protection state → reject
+
+Never fail open.
+
+Never use:
+- fake data
+- mock data
+- demo market values
+- hardcoded account balance
+- hardcoded tick value
+- external market-data providers
+
+--------------------------------------------------
+8.21 TESTING
+--------------------------------------------------
+
+After implementation, create/update tests for all Risk Manager functionality.
+
+Minimum coverage:
+
+1. Risk percentage validation
+2. Lot size calculation
+3. Lot size min/max/step normalization
+4. Risk cap enforcement
+5. Invalid symbol specifications
+6. Invalid SL
+7. Invalid TP
+8. RR rejection
+9. RR approval
+10. Maximum open trades
+11. Daily loss protection
+12. Daily profit protection
+13. Drawdown protection
+14. Consecutive loss protection
+15. Spread protection
+16. Session protection
+17. News protection
+18. Exposure protection
+19. Full approval path
+20. Full rejection path
+21. Fail-closed behavior
+22. Trade Manager cannot bypass Risk Manager
+23. No duplicate closed-trade counting
+24. Daily reset behavior
+
+Tests must not require fake market-data providers.
+
+Where real MT5 is required, use dependency injection/interfaces and test the Risk Manager with deterministic fixtures without introducing fake production data paths.
+
+--------------------------------------------------
+ARCHITECTURAL RULES
+--------------------------------------------------
+
+1. Risk Manager must become the SINGLE SOURCE OF TRUTH for trade risk approval.
+
+2. Do not duplicate lot-size/risk/RR calculations elsewhere.
+
+3. Reuse existing MT5 connector/account/symbol interfaces.
+
+4. Reuse existing AI/SMC/News/Trade Manager interfaces.
+
+5. Do not modify unrelated sections unless a minimal integration change is strictly required.
+
+6. Do not redesign working architecture.
+
+7. Do not remove existing functionality.
+
+8. Do not implement future Section 8 features unnecessarily.
+
+9. Do not implement correlation protection unless already present.
+
+10. Do not create fake fallback data.
+
+11. Risk Manager must fail CLOSED.
+
+12. Keep async architecture consistent with the existing project.
+
+13. Keep business logic testable through dependency injection.
+
+14. Preserve existing API naming and serialization conventions.
+
+==================================================
+IMPLEMENTATION PROCESS
+==================================================
+
+Perform this as ONE continuous task:
+
+STEP 1:
+Inspect the existing project and identify reusable Risk Manager functionality and integration points.
+
+STEP 2:
+Implement all missing Section 8 requirements immediately.
+
+STEP 3:
+Integrate only the minimum necessary changes into AI/SMC/News/Trade Manager/API/config/database layers.
+
+STEP 4:
+Remove or redirect duplicate risk/lot-size/RR logic only where necessary so Risk Manager remains authoritative.
+
+STEP 5:
+Run formatting/static checks/import checks.
+
+STEP 6:
+Run the complete relevant test suite.
+
+STEP 7:
+Fix all failures caused by the implementation.
+
+STEP 8:
+Run a final integrity check confirming unrelated modules were not unnecessarily modified.
+
+DO NOT STOP AFTER STEP 1.
+DO NOT RETURN AN AUDIT-ONLY REPORT.
+DO NOT ASK FOR APPROVAL BETWEEN STEPS.
+
+==================================================
+FINAL REPORT
+==================================================
+
+At the end provide:
+
+- Exact files created
+- Exact files modified
+- Exact files intentionally untouched
+- What was already present and reused
+- What was newly implemented
+- Risk Manager architecture
+- Trade approval flow
+- Configuration added
+- API/dashboard changes
+- Tests added/updated
+- Test results
+- Any genuine platform limitations
+- Any explicitly deferred future features
+- Final Section 8 completion percentage
+
+The goal is to leave SECTION 8 production-ready and complete according to the specification, while preserving the existing project architecture.
+
+STOP only after implementation and verification are complete.
