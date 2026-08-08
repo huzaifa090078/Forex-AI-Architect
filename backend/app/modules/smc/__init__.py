@@ -15,6 +15,8 @@ Import from here to avoid coupling to internal module layout::
 """
 
 from app.modules.smc.interfaces import (
+    ConfluenceFactor,
+    ConfluenceResult,
     ISMCAnalyzer,
     MTFAnalysis,
     SMCPattern,
@@ -34,6 +36,8 @@ __all__ = [
     "TrendBias",
     "TimeframeAnalysis",
     "MTFAnalysis",
+    "ConfluenceFactor",
+    "ConfluenceResult",
     "ISMCAnalyzer",
     "BaseSMCAnalyzer",
 ]

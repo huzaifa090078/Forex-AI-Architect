@@ -5,7 +5,13 @@ Smart Money Concepts — base implementation scaffold.
 import logging
 from typing import Any, Dict, List
 
-from app.modules.smc.interfaces import ISMCAnalyzer, MTFAnalysis, SMCStructure, Zone
+from app.modules.smc.interfaces import (
+    ConfluenceResult,
+    ISMCAnalyzer,
+    MTFAnalysis,
+    SMCStructure,
+    Zone,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -56,3 +62,11 @@ class BaseSMCAnalyzer(ISMCAnalyzer):
         ohlcv_per_timeframe: Dict[str, List[Dict[str, Any]]],
     ) -> MTFAnalysis:
         raise NotImplementedError("Implement multi-timeframe SMC aggregation")
+
+    def score_confluence(
+        self,
+        mtf: MTFAnalysis,
+        ohlcv: List[Dict[str, Any]],
+        current_price: float,
+    ) -> ConfluenceResult:
+        raise NotImplementedError("Implement confluence scoring")

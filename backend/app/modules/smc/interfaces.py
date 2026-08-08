@@ -131,6 +131,47 @@ class MTFAnalysis:
     pair:                   str = ""
 
 
+@dataclass
+class ConfluenceFactor:
+    """
+    Individual scored component within a ConfluenceResult.
+
+    name      — machine-readable factor identifier (e.g. "order_block_alignment")
+    score     — points this factor contributed (0 – max_score)
+    max_score — maximum possible contribution from this factor
+    confirmed — True when score > 0 (factor fired in the expected direction)
+    reason    — one-sentence human-readable explanation of the result
+    """
+    name:      str
+    score:     float
+    max_score: float
+    confirmed: bool
+    reason:    str
+
+
+@dataclass
+class ConfluenceResult:
+    """
+    Normalized 0–100 confluence score for a pair/price at a point in time.
+
+    Eight independent factors are evaluated and their scores summed.
+    The total is already on a 0–100 scale (factor max scores sum to 100).
+
+    score           — 0–100 composite score (integer, rounded)
+    bias            — overall directional bias inherited from the MTFAnalysis
+    factors         — ordered list of individual ConfluenceFactor breakdowns
+    confirmed_count — number of factors where score > 0
+    total_factors   — total factor count (always 8 when all inputs are valid)
+    analysed_at     — UTC computation time
+    """
+    score:           int
+    bias:            TrendBias
+    factors:         List[ConfluenceFactor]
+    confirmed_count: int
+    total_factors:   int
+    analysed_at:     datetime = field(default_factory=datetime.utcnow)
+
+
 class ISMCAnalyzer(ABC):
     """Detect and classify SMC structures from raw OHLCV data."""
 
@@ -191,5 +232,31 @@ class ISMCAnalyzer(ABC):
         Accepts any subset of {"H4", "H1", "M15", "M5"} as keys.
         The caller is responsible for pair association;
         MTFAnalysis.pair is always "" on return (the _PAIR_UNSET sentinel).
+        """
+        ...
+
+    @abstractmethod
+    def score_confluence(
+        self,
+        mtf: MTFAnalysis,
+        ohlcv: List[Dict[str, Any]],
+        current_price: float,
+    ) -> ConfluenceResult:
+        """
+        Compute a normalized 0–100 confluence score from pre-computed SMC data.
+
+        Evaluates eight independent factors (max pts each):
+          1. BOS/CHoCH multi-timeframe alignment  (20)
+          2. Order Block at current price          (15)
+          3. Fair Value Gap at current price       (15)
+          4. Liquidity Sweep confirmation          (15)
+          5. Supply/Demand zone alignment          (15)
+          6. Premium/Discount zone alignment       (10)
+          7. RSI-14 confirmation                    (5)
+          8. EMA-20 confirmation                    (5)
+
+        All SMC inputs are taken from the pre-computed MTFAnalysis; ohlcv is
+        used only for RSI-14 and EMA-20 calculations. No detect_* methods are
+        called inside this method. Analysis-only — no trade decisions.
         """
         ...

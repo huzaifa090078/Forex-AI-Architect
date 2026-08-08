@@ -32,6 +32,8 @@ import numpy as np
 
 from app.modules.smc.base import BaseSMCAnalyzer
 from app.modules.smc.interfaces import (
+    ConfluenceFactor,
+    ConfluenceResult,
     MTFAnalysis,
     SMCPattern,
     SMCStructure,
@@ -39,6 +41,7 @@ from app.modules.smc.interfaces import (
     TrendBias,
     Zone,
 )
+from app.modules.indicators.calculations import calc_ema, calc_rsi
 from app.modules.smc.calculations import (
     extract_arrays,
     calc_market_structure,
@@ -724,4 +727,403 @@ class SMCAnalyzer(BaseSMCAnalyzer):
             missing_timeframes=missing,
             timeframes=tf_analyses,
             dominant_zones=dominant_zones,
+        )
+
+    # ── ISMCAnalyzer — score_confluence ───────────────────────────────────────
+
+    def score_confluence(
+        self,
+        mtf: MTFAnalysis,
+        ohlcv: List[Dict[str, Any]],
+        current_price: float,
+    ) -> ConfluenceResult:
+        """
+        Compute a normalized 0–100 confluence score from pre-computed SMC data.
+
+        Eight independent factors are scored and summed. Factor max scores
+        sum to exactly 100 so no normalization step is needed.
+
+        All SMC inputs are taken from the supplied MTFAnalysis; no detect_*
+        methods are called here. ohlcv is used only for RSI-14 and EMA-20.
+        Analysis-only — no trading decisions, no lot sizing, no risk rules.
+
+        Args:
+            mtf           — pre-computed MTFAnalysis (from analyze_multi_timeframe)
+            ohlcv         — OHLCV bar list used only for RSI-14 and EMA-20
+            current_price — the price level to score at
+
+        Returns:
+            ConfluenceResult with score 0–100 and per-factor breakdown.
+        """
+        bias    = mtf.bias
+        factors: List[ConfluenceFactor] = []
+
+        # ── Pre-compute closes array for RSI/EMA (shared; fail gracefully) ────
+        closes_arr: Optional[np.ndarray] = None
+        if ohlcv:
+            try:
+                _, _, _, closes_arr, _ = extract_arrays(ohlcv)
+            except Exception as exc:
+                logger.debug("score_confluence: OHLCV extraction failed — %s", exc)
+
+        # ── Factor 1: BOS/CHoCH multi-timeframe alignment (max 20) ───────────
+        if bias == TrendBias.NEUTRAL:
+            f1_score  = 0.0
+            f1_reason = "No directional bias established — BOS/CHoCH alignment skipped."
+        elif mtf.aligned:
+            # H1 agrees with overall bias; full weighted score
+            f1_score  = round(20.0 * mtf.alignment_score, 2)
+            f1_reason = (
+                f"H1 confirms {bias.value} bias; MTF alignment "
+                f"{mtf.alignment_score:.0%} across "
+                f"{', '.join(mtf.available_timeframes)}."
+            )
+        else:
+            # Bias present but H1 not aligned — partial credit
+            f1_score  = round(10.0 * mtf.alignment_score, 2)
+            f1_reason = (
+                f"{bias.value.capitalize()} bias from "
+                f"{mtf.dominant_timeframe or 'higher TF'} "
+                f"but H1 not aligned — partial score."
+            )
+        factors.append(ConfluenceFactor(
+            name="bos_choch_alignment",
+            score=f1_score,
+            max_score=20.0,
+            confirmed=f1_score > 0.0,
+            reason=f1_reason,
+        ))
+
+        # ── Factor 2: Order Block at current price (max 15) ───────────────────
+        # Active = validated (impulse-confirmed) and not mitigated.
+        # Direction must match bias; zone must contain current_price.
+        f2_strength = 0.0
+        f2_tf       = ""
+        for tf in _CANONICAL_TFS:
+            if tf not in mtf.timeframes:
+                continue
+            for ob in mtf.timeframes[tf].order_blocks:
+                if (
+                    ob.validated
+                    and not ob.metadata.get("mitigated", False)
+                    and ob.direction == bias.value
+                    and ob.price_low <= current_price <= ob.price_high
+                    and ob.strength > f2_strength
+                ):
+                    f2_strength = ob.strength
+                    f2_tf       = tf
+
+        if f2_strength > 0.0:
+            f2_score  = round(15.0 * f2_strength, 2)
+            f2_reason = (
+                f"Active {bias.value} order block on {f2_tf} contains "
+                f"current price (strength {f2_strength:.2f})."
+            )
+            f2_confirmed = True
+        else:
+            f2_score     = 0.0
+            f2_confirmed = False
+            f2_reason    = (
+                f"No active {bias.value} order block at current price "
+                f"{current_price:.5f}."
+            )
+        factors.append(ConfluenceFactor(
+            name="order_block_alignment",
+            score=f2_score,
+            max_score=15.0,
+            confirmed=f2_confirmed,
+            reason=f2_reason,
+        ))
+
+        # ── Factor 3: Fair Value Gap at current price (max 15) ────────────────
+        # Unfilled (validated=True) FVG whose zone contains current_price
+        # and whose direction matches bias.
+        f3_strength = 0.0
+        f3_tf       = ""
+        for tf in _CANONICAL_TFS:
+            if tf not in mtf.timeframes:
+                continue
+            for fvg in mtf.timeframes[tf].fvgs:
+                if (
+                    fvg.validated   # unfilled = still active imbalance
+                    and fvg.direction == bias.value
+                    and fvg.price_low <= current_price <= fvg.price_high
+                    and fvg.strength > f3_strength
+                ):
+                    f3_strength = fvg.strength
+                    f3_tf       = tf
+
+        if f3_strength > 0.0:
+            f3_score  = round(15.0 * f3_strength, 2)
+            f3_reason = (
+                f"Unfilled {bias.value} FVG on {f3_tf} contains "
+                f"current price (strength {f3_strength:.2f})."
+            )
+            f3_confirmed = True
+        else:
+            f3_score     = 0.0
+            f3_confirmed = False
+            f3_reason    = (
+                f"No unfilled {bias.value} FVG at current price "
+                f"{current_price:.5f}."
+            )
+        factors.append(ConfluenceFactor(
+            name="fvg_alignment",
+            score=f3_score,
+            max_score=15.0,
+            confirmed=f3_confirmed,
+            reason=f3_reason,
+        ))
+
+        # ── Factor 4: Liquidity Sweep confirmation (max 15) ───────────────────
+        # A confirmed sweep (close-reversed wick) in the bias direction means
+        # opposing stops have been cleared, supporting the next move.
+        # Prioritise higher timeframes (H4 → M5 iteration order).
+        f4_found = False
+        f4_tf    = ""
+        for tf in _CANONICAL_TFS:
+            if tf not in mtf.timeframes:
+                continue
+            for liq in mtf.timeframes[tf].liquidity:
+                if (
+                    liq.pattern == SMCPattern.LIQUIDITY_SWEEP
+                    and liq.direction == bias.value
+                ):
+                    f4_found = True
+                    f4_tf    = tf
+                    break
+            if f4_found:
+                break
+
+        if bias == TrendBias.NEUTRAL:
+            f4_score     = 0.0
+            f4_confirmed = False
+            f4_reason    = "No bias — liquidity sweep evaluation skipped."
+        elif f4_found:
+            f4_score     = 15.0
+            f4_confirmed = True
+            f4_reason    = (
+                f"{bias.value.capitalize()} liquidity sweep confirmed on {f4_tf}; "
+                "opposing stops cleared."
+            )
+        else:
+            f4_score     = 0.0
+            f4_confirmed = False
+            f4_reason    = (
+                f"No {bias.value} liquidity sweep detected — opposing stops "
+                "not yet confirmed cleared."
+            )
+        factors.append(ConfluenceFactor(
+            name="liquidity_sweep",
+            score=f4_score,
+            max_score=15.0,
+            confirmed=f4_confirmed,
+            reason=f4_reason,
+        ))
+
+        # ── Factor 5: Supply/Demand zone alignment (max 15) ───────────────────
+        # Active (validated, not mitigated) zone whose direction matches bias.
+        # "Near" = current_price within 2× zone height from the zone edge.
+        target_pattern = (
+            SMCPattern.DEMAND_ZONE
+            if bias == TrendBias.BULLISH
+            else SMCPattern.SUPPLY_ZONE
+        )
+        f5_strength = 0.0
+        f5_tf       = ""
+        for tf in _CANONICAL_TFS:
+            if tf not in mtf.timeframes:
+                continue
+            for sd in mtf.timeframes[tf].supply_demand:
+                if sd.pattern != target_pattern or not sd.validated:
+                    continue
+                zone_h  = sd.price_high - sd.price_low
+                margin  = 2.0 * zone_h if zone_h > 0.0 else float("inf")
+                if bias == TrendBias.BULLISH:
+                    near = current_price <= sd.price_high + margin
+                else:
+                    near = current_price >= sd.price_low - margin
+                if near and sd.strength > f5_strength:
+                    f5_strength = sd.strength
+                    f5_tf       = tf
+
+        if f5_strength > 0.0:
+            f5_score  = round(15.0 * f5_strength, 2)
+            f5_reason = (
+                f"Active {target_pattern.value.replace('_', ' ')} on {f5_tf} "
+                f"aligns with {bias.value} bias "
+                f"(strength {f5_strength:.2f})."
+            )
+            f5_confirmed = True
+        else:
+            f5_score     = 0.0
+            f5_confirmed = False
+            f5_reason    = (
+                f"No active {target_pattern.value.replace('_', ' ')} "
+                "near current price."
+            )
+        factors.append(ConfluenceFactor(
+            name="supply_demand_alignment",
+            score=f5_score,
+            max_score=15.0,
+            confirmed=f5_confirmed,
+            reason=f5_reason,
+        ))
+
+        # ── Factor 6: Premium/Discount zone alignment (max 10) ────────────────
+        # Bullish bias: buying at a Discount (ideal) → 10 pts; Equilibrium → 5 pts.
+        # Bearish bias: selling at a Premium (ideal) → 10 pts; Equilibrium → 5 pts.
+        try:
+            price_zone = self.classify_price_zone("confluence", current_price, ohlcv)
+        except Exception:
+            price_zone = Zone.EQUILIBRIUM
+
+        if bias == TrendBias.BULLISH:
+            if price_zone == Zone.DISCOUNT:
+                f6_score  = 10.0
+                f6_reason = "Price in Discount zone — buying at institutional value."
+            elif price_zone == Zone.EQUILIBRIUM:
+                f6_score  = 5.0
+                f6_reason = "Price at Equilibrium — moderate premium/discount alignment."
+            else:
+                f6_score  = 0.0
+                f6_reason = "Price in Premium zone — elevated risk for bullish entry."
+        elif bias == TrendBias.BEARISH:
+            if price_zone == Zone.PREMIUM:
+                f6_score  = 10.0
+                f6_reason = "Price in Premium zone — selling at institutional value."
+            elif price_zone == Zone.EQUILIBRIUM:
+                f6_score  = 5.0
+                f6_reason = "Price at Equilibrium — moderate premium/discount alignment."
+            else:
+                f6_score  = 0.0
+                f6_reason = "Price in Discount zone — elevated risk for bearish entry."
+        else:
+            f6_score  = 0.0
+            f6_reason = "No bias — premium/discount alignment skipped."
+        factors.append(ConfluenceFactor(
+            name="premium_discount_alignment",
+            score=f6_score,
+            max_score=10.0,
+            confirmed=f6_score > 0.0,
+            reason=f6_reason,
+        ))
+
+        # ── Factor 7: RSI-14 confirmation (max 5) ─────────────────────────────
+        # Bullish: RSI < 70 (room to run upward, not overbought).
+        # Bearish: RSI > 30 (room to fall, not oversold).
+        # Delegates to calc_rsi from the existing Indicator Engine.
+        f7_score  = 0.0
+        f7_reason = "RSI-14 unavailable (insufficient bars or data error)."
+        if closes_arr is not None:
+            try:
+                rsi_arr = calc_rsi(closes_arr, period=14)
+                rsi_val = float(rsi_arr[-1]) if not np.isnan(rsi_arr[-1]) else None
+                if rsi_val is not None:
+                    if bias == TrendBias.BULLISH:
+                        if rsi_val < 70.0:
+                            f7_score  = 5.0
+                            f7_reason = (
+                                f"RSI-14 {rsi_val:.1f} — not overbought; "
+                                "bullish momentum has room to extend."
+                            )
+                        else:
+                            f7_reason = (
+                                f"RSI-14 {rsi_val:.1f} — overbought; "
+                                "bullish entry risk elevated."
+                            )
+                    elif bias == TrendBias.BEARISH:
+                        if rsi_val > 30.0:
+                            f7_score  = 5.0
+                            f7_reason = (
+                                f"RSI-14 {rsi_val:.1f} — not oversold; "
+                                "bearish momentum has room to extend."
+                            )
+                        else:
+                            f7_reason = (
+                                f"RSI-14 {rsi_val:.1f} — oversold; "
+                                "bearish entry risk elevated."
+                            )
+                    else:
+                        f7_reason = (
+                            f"RSI-14 {rsi_val:.1f} — no bias; "
+                            "RSI confirmation skipped."
+                        )
+            except Exception as exc:
+                logger.debug("score_confluence: RSI-14 failed — %s", exc)
+        factors.append(ConfluenceFactor(
+            name="rsi_confirmation",
+            score=f7_score,
+            max_score=5.0,
+            confirmed=f7_score > 0.0,
+            reason=f7_reason,
+        ))
+
+        # ── Factor 8: EMA-20 confirmation (max 5) ─────────────────────────────
+        # Bullish: current_price above EMA-20 confirms upward trend.
+        # Bearish: current_price below EMA-20 confirms downward trend.
+        # Delegates to calc_ema from the existing Indicator Engine.
+        f8_score  = 0.0
+        f8_reason = "EMA-20 unavailable (insufficient bars or data error)."
+        if closes_arr is not None:
+            try:
+                ema_arr = calc_ema(closes_arr, period=20)
+                ema_val = float(ema_arr[-1]) if not np.isnan(ema_arr[-1]) else None
+                if ema_val is not None:
+                    if bias == TrendBias.BULLISH:
+                        if current_price > ema_val:
+                            f8_score  = 5.0
+                            f8_reason = (
+                                f"Price {current_price:.5f} above "
+                                f"EMA-20 ({ema_val:.5f}) — bullish trend confirmed."
+                            )
+                        else:
+                            f8_reason = (
+                                f"Price {current_price:.5f} below "
+                                f"EMA-20 ({ema_val:.5f}) — bullish trend unconfirmed."
+                            )
+                    elif bias == TrendBias.BEARISH:
+                        if current_price < ema_val:
+                            f8_score  = 5.0
+                            f8_reason = (
+                                f"Price {current_price:.5f} below "
+                                f"EMA-20 ({ema_val:.5f}) — bearish trend confirmed."
+                            )
+                        else:
+                            f8_reason = (
+                                f"Price {current_price:.5f} above "
+                                f"EMA-20 ({ema_val:.5f}) — bearish trend unconfirmed."
+                            )
+                    else:
+                        f8_reason = (
+                            f"EMA-20 {ema_val:.5f} — no bias; "
+                            "EMA confirmation skipped."
+                        )
+            except Exception as exc:
+                logger.debug("score_confluence: EMA-20 failed — %s", exc)
+        factors.append(ConfluenceFactor(
+            name="ema_confirmation",
+            score=f8_score,
+            max_score=5.0,
+            confirmed=f8_score > 0.0,
+            reason=f8_reason,
+        ))
+
+        # ── Totals ────────────────────────────────────────────────────────────
+        # Factor max scores sum to 100 exactly; clamp only against float drift.
+        raw_total       = sum(f.score for f in factors)
+        score           = min(100, round(raw_total))
+        confirmed_count = sum(1 for f in factors if f.confirmed)
+
+        logger.debug(
+            "score_confluence: bias=%s score=%d confirmed=%d/%d",
+            bias.value, score, confirmed_count, len(factors),
+        )
+
+        return ConfluenceResult(
+            score=score,
+            bias=bias,
+            factors=factors,
+            confirmed_count=confirmed_count,
+            total_factors=len(factors),
         )
