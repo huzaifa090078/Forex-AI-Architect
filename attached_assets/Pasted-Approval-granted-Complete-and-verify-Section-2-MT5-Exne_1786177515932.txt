@@ -1,0 +1,50 @@
+Approval granted.
+
+Complete and verify Section 2 — MT5 / Exness Integration only.
+
+First inspect the existing Section 2 implementation and architecture. Do not rewrite existing working code.
+
+Requirements:
+- Connect backend to the real MetaTrader 5 Python API.
+- Support Exness account connection through MT5 terminal.
+- Keep MT5 credentials strictly in backend environment variables.
+- Implement/complete terminal initialization and connection health checking.
+- Verify account information can be retrieved.
+- Verify symbol availability for the project's 10 currency pairs.
+- Verify live tick/bid/ask data retrieval.
+- Verify OHLCV/rates retrieval for the required timeframes.
+- Verify the existing Market Data Engine can consume the MT5 provider without bypassing Section 2.
+- Preserve the existing provider interfaces and architecture.
+- No mock, fake, Yahoo Finance, Alpha Vantage, TradingView, or fallback market-data source.
+- Do NOT implement AI, Risk Manager, Trade Manager, or any new trading strategy.
+- Do NOT place real orders yet.
+- Do NOT modify Sections 6 or other unrelated modules unless strictly required to complete the existing Section 2 integration.
+- MT5 credentials must never appear in API responses, logs, frontend code, or exceptions.
+- Handle Linux/Replit correctly: MT5 live connection may fail because MT5 requires Windows. This must be reported as an environment limitation, not hidden with fake data.
+
+Verification:
+1. py_compile
+2. pyflakes
+3. Unit/integration checks for the MT5 adapter/provider
+4. Verify account/tick/OHLCV paths where the environment permits
+5. Verify failure handling when MT5 is unavailable
+6. Confirm no mock data path exists
+
+Before changing anything, produce a concise Change Plan listing:
+- files to modify
+- files not to modify
+- exact changes
+- verification plan
+
+Stop and wait for approval before writing code.
+
+After implementation, report:
+- files changed
+- exact changes
+- files not modified
+- verification results
+- what was verified live vs what requires Windows MT5/Exness environment
+
+Do not proceed to Section 7.
+
+Waiting for approval.
