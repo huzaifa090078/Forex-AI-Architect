@@ -1,0 +1,646 @@
+SECTION 10 — MASTER IMPLEMENTATION PROMPT
+News Filter Engine — Production Implementation
+
+Implement Section 10 — News Filter Engine completely inside the existing Forex AI Architect project.
+
+Critical instruction
+
+Do not redesign the existing architecture.
+
+Before modifying anything:
+
+Inspect the complete existing project structure.
+Inspect Sections 1–9 implementations.
+Inspect existing:
+Risk Manager
+Trade Manager
+Market Scanner
+AI Decision Engine
+configuration system
+database models
+API/router structure
+authentication/authorization
+background task/lifecycle patterns
+existing news/calendar code, if any.
+Reuse existing abstractions and conventions wherever possible.
+Do not duplicate existing functionality.
+Do not modify Sections 1–9 unnecessarily.
+Do not implement live trade execution in this section.
+Do not make News Filter responsible for BUY/SELL decisions.
+Do not invent an external news API or pretend that live news data exists.
+If a real news provider is not currently configured, implement a clean provider abstraction and a safe unavailable-data state.
+10.1 RESPONSIBILITY
+
+Create a production-ready News Filter Engine responsible for:
+
+detecting economic events,
+classifying impact,
+identifying affected currencies,
+identifying affected forex pairs,
+determining whether a pair is inside a configurable news-risk window,
+informing the Risk Manager,
+exposing news information through the API/dashboard layer,
+generating pause/resume state,
+maintaining upcoming/live/finished event state.
+
+The News Filter must not independently execute trades or make trading decisions.
+
+Architecture:
+
+Economic Calendar Provider
+          ↓
+   News Filter Engine
+          ↓
+      Risk Manager
+          ↓
+     Trade Manager
+10.2 PROVIDER ARCHITECTURE
+
+Create a provider abstraction such as:
+
+EconomicCalendarProvider
+
+with operations needed to retrieve upcoming/relevant economic events.
+
+The provider must return normalized internal news-event objects.
+
+Do not hardcode a fake external API.
+
+If the project already contains a news provider, reuse it.
+
+If no real provider exists:
+
+create the provider interface,
+create a safe unavailable/no-data implementation,
+make the News Filter operate correctly when no provider is configured,
+never fabricate economic events,
+never generate fake news timestamps,
+never pretend live news data is available.
+
+Provider failures must be handled gracefully.
+
+10.3 NEWS EVENT MODEL
+
+Create or extend the appropriate database/domain model according to existing architecture.
+
+A normalized news event should contain at minimum:
+
+id
+event_name
+currency
+impact
+event_time
+source
+actual
+forecast
+previous
+status
+created_at
+updated_at
+
+Use appropriate types.
+
+Impact must be represented using a controlled enum:
+
+HIGH
+MEDIUM
+LOW
+
+Status:
+
+UPCOMING
+LIVE
+FINISHED
+
+Do not store credentials or provider secrets inside news records.
+
+10.4 IMPACT CLASSIFICATION
+
+Support:
+
+HIGH
+
+Examples:
+
+Interest Rate Decision
+FOMC
+NFP
+CPI
+GDP
+Central Bank Speech
+MEDIUM
+
+Examples:
+
+Manufacturing PMI
+Retail Sales
+Employment Reports
+LOW
+
+Normally ignored for trading-risk purposes unless the user enables them.
+
+Do not rely only on event-name string matching if the provider already supplies an impact level.
+
+Provider-supplied impact should be normalized into the internal enum.
+
+10.5 CURRENCY DETECTION
+
+The engine must determine which currency is affected by each event.
+
+Example:
+
+USD → USD-related events
+JPY → JPY-related events
+EUR → EUR-related events
+GBP → GBP-related events
+AUD → AUD-related events
+NZD → NZD-related events
+CAD → CAD-related events
+CHF → CHF-related events
+
+Create a centralized currency-to-pair mapping based on the project's supported FOREX_PAIRS.
+
+Do not hardcode a separate incompatible pair list.
+
+For example:
+
+USD news:
+EURUSD
+GBPUSD
+USDJPY
+USDCHF
+USDCAD
+AUDUSD
+NZDUSD
+
+JPY:
+
+USDJPY
+EURJPY
+GBPJPY
+
+The actual affected-pair calculation must be deterministic and based on the pair's base/quote currencies.
+
+10.6 PAIR IMPACT DETECTION
+
+Provide functionality such as:
+
+get_affected_pairs(event)
+
+and/or:
+
+is_pair_affected(pair, event)
+
+A pair is affected when its base or quote currency matches the event currency.
+
+Example:
+
+USD event + EURUSD → affected
+USD event + GBPUSD → affected
+USD event + EURGBP → not affected
+
+Avoid duplicate pair results.
+
+10.7 NEWS RISK WINDOW
+
+Implement configurable windows.
+
+Required configuration:
+
+NEWS_HIGH_IMPACT_ENABLED
+NEWS_MEDIUM_IMPACT_ENABLED
+NEWS_LOW_IMPACT_ENABLED
+
+NEWS_PAUSE_BEFORE_MINUTES
+NEWS_RESUME_AFTER_MINUTES
+
+Default values may follow the specification:
+
+before = 30 minutes
+after = 15–30 minutes
+
+But use the project's existing configuration conventions.
+
+Do not hardcode these values in business logic.
+
+10.8 NEWS STATE
+
+For each event determine:
+
+UPCOMING
+
+Current time is before the event.
+
+LIVE
+
+Current time is within the event's active/news period.
+
+FINISHED
+
+The event and its configured post-news window have ended.
+
+Use timezone-aware UTC internally.
+
+Do not mix naive and timezone-aware datetimes.
+
+10.9 PAIR TRADING STATUS
+
+Expose a deterministic evaluation function such as:
+
+evaluate_pair(pair, now)
+
+It should return information such as:
+
+pair
+affected
+blocked
+reason
+impact
+event_name
+event_time
+minutes_to_event
+status
+
+Possible reasons:
+
+NO_RELEVANT_NEWS
+HIGH_IMPACT_NEWS_WINDOW
+MEDIUM_IMPACT_NEWS_WINDOW
+LOW_IMPACT_NEWS_WINDOW
+NEWS_PROVIDER_UNAVAILABLE
+
+Do not silently convert provider failure into fake "safe" news status.
+
+The system should distinguish:
+
+NO NEWS
+
+from:
+
+NEWS DATA UNAVAILABLE
+10.10 RISK MANAGER INTEGRATION
+
+The News Filter must provide information to the existing Risk Manager.
+
+Do not bypass the Risk Manager.
+
+Do not create a second risk engine.
+
+Extend the existing Risk Manager integration using the project's existing architecture.
+
+The Risk Manager should be able to determine:
+
+news_blocked = True/False
+
+and the reason.
+
+Example:
+
+Risk Manager
+    ↓
+News Filter
+    ↓
+HIGH_IMPACT_NEWS_WINDOW
+    ↓
+Risk approval rejected
+
+The News Filter itself must not create the final BUY/SELL/NO-TRADE decision.
+
+10.11 TRADE MANAGER BOUNDARY
+
+Do not modify Trade Manager to independently check external news APIs.
+
+The intended flow remains:
+
+AI
+ ↓
+Risk Manager
+ ↓
+News Filter information
+ ↓
+Risk Approval
+ ↓
+Trade Manager
+ ↓
+MT5 Connector
+
+Trade Manager executes only valid RiskApproval objects.
+
+Do not weaken or bypass the Section 8 RiskApproval gate.
+
+10.12 EXISTING OPEN TRADES
+
+V1 must NOT automatically close existing trades merely because news is approaching.
+
+Support configurable policy/state information for:
+
+NO_ACTION
+MANUAL_MONITORING
+
+If the existing architecture already supports break-even or SL adjustment through approved paths, do not bypass those paths.
+
+Do not implement automatic SL tightening or break-even movement unless explicitly supported by the existing specification and architecture.
+
+10.13 DASHBOARD/API
+
+Add appropriate API endpoints following the existing API conventions.
+
+At minimum support functionality equivalent to:
+
+GET /news
+GET /news/upcoming
+GET /news/status
+GET /news/pair/{pair}
+
+Exact paths should follow the existing router conventions.
+
+Responses should expose:
+
+event_name
+currency
+impact
+event_time
+status
+affected_pairs
+minutes_to_event
+
+Do not expose provider credentials.
+
+Do not expose API keys.
+
+Do not expose internal secrets.
+
+10.14 COUNTDOWN
+
+Dashboard/API should provide a calculated countdown:
+
+minutes_to_event
+
+or equivalent.
+
+Calculate it dynamically from the current UTC time rather than storing a constantly changing countdown in the database.
+
+For finished events it may be:
+
+null
+
+or another clearly documented representation.
+
+10.15 ALERTS
+
+Implement the domain/event mechanism needed for:
+
+HIGH_IMPACT_NEWS_COMING
+TRADING_PAUSED
+TRADING_RESUMED
+
+Follow the project's existing notification/event architecture.
+
+Do not invent a completely separate notification framework if one already exists.
+
+Alerts should be generated based on state transitions, not every polling cycle.
+
+Example:
+
+UPCOMING
+   ↓
+pause window reached
+   ↓
+TRADING_PAUSED
+
+and later:
+
+post-news window finished
+   ↓
+TRADING_RESUMED
+
+Avoid duplicate alerts.
+
+10.16 BACKGROUND REFRESH
+
+If the project already has a background-task pattern, use it.
+
+News refresh should:
+
+periodically request provider data,
+normalize events,
+update/cache relevant events,
+handle provider failures,
+avoid duplicate events,
+not crash the application,
+stop cleanly during application shutdown.
+
+Do not create multiple background loops.
+
+Use configuration for refresh interval.
+
+10.17 CACHING
+
+Do not call an external provider unnecessarily on every Risk Manager evaluation.
+
+Implement an appropriate cache/database strategy.
+
+Risk evaluation should preferably operate against normalized locally available data.
+
+Cache/provider failures must be distinguishable from genuinely having no relevant events.
+
+10.18 DUPLICATE EVENTS
+
+Normalize provider events using a stable identity.
+
+Avoid creating duplicate database records every time the provider refreshes.
+
+Possible identity components:
+
+provider
+event_name
+currency
+event_time
+
+Use a proper unique constraint where appropriate.
+
+Do not rely only on Python in-memory duplicate checking.
+
+10.19 CONFIGURATION
+
+Add only the configuration values genuinely required by Section 10.
+
+Examples:
+
+NEWS_HIGH_IMPACT_ENABLED
+NEWS_MEDIUM_IMPACT_ENABLED
+NEWS_LOW_IMPACT_ENABLED
+NEWS_PAUSE_BEFORE_MINUTES
+NEWS_RESUME_AFTER_MINUTES
+NEWS_REFRESH_INTERVAL_SECONDS
+
+If a provider is required, its credentials/configuration must come from environment variables/secrets.
+
+Never hardcode API keys.
+
+Never log provider credentials.
+
+10.20 SECURITY
+
+The News Filter must:
+
+never expose provider API keys,
+never log provider secrets,
+never return secrets through API responses,
+validate provider data,
+sanitize external strings where appropriate,
+use timezone-aware timestamps,
+avoid arbitrary URL fetching based on untrusted user input,
+avoid executing provider-provided content.
+10.21 FAILURE BEHAVIOR
+
+Handle:
+
+provider timeout,
+provider unavailable,
+malformed event,
+missing currency,
+missing event time,
+invalid impact,
+duplicate event,
+database failure,
+stale cached data.
+
+Never fabricate data.
+
+Never crash the whole bot because the news provider is unavailable.
+
+Expose the provider health/data freshness clearly.
+
+10.22 TESTING
+
+Create focused tests covering:
+
+Event model
+valid HIGH event
+MEDIUM event
+LOW event
+invalid impact
+timezone-aware event time
+Currency mapping
+USD
+EUR
+GBP
+JPY
+CHF
+CAD
+AUD
+NZD
+Pair detection
+
+Verify affected and unaffected pairs.
+
+Example:
+
+USD + EURUSD → affected
+USD + GBPUSD → affected
+USD + EURGBP → unaffected
+Timing
+
+Test:
+
+31 minutes before → not blocked
+30 minutes before → blocked
+during event → blocked
+after configured resume window → unblocked
+
+Use boundary tests.
+
+Impact configuration
+
+Verify:
+
+HIGH enabled → blocks
+HIGH disabled → does not block
+MEDIUM enabled → blocks medium event
+LOW disabled → ignored
+Provider failure
+
+Verify:
+
+timeout handled
+unavailable state represented
+no fake events generated
+application remains operational
+Duplicate prevention
+
+Same provider event must not create duplicate database records.
+
+Risk integration
+
+Verify News Filter information reaches Risk Manager correctly.
+
+Security
+
+Verify:
+
+API keys never appear in API response
+API keys never appear in logs
+provider secrets are not stored in event records
+Lifecycle
+
+Verify background refresh starts once and stops cleanly.
+
+10.23 DO NOT IMPLEMENT
+
+Do NOT implement:
+
+AI news sentiment
+machine learning news prediction
+automatic trade execution
+independent BUY/SELL decisions
+automatic trade closing because of news
+automatic re-entry
+breaking-news intelligence
+multiple live providers unless already supported
+fake/mock production news data
+hardcoded economic-calendar events
+
+These are outside Section 10 V1.
+
+10.24 ARCHITECTURAL REQUIREMENT
+
+The final architecture must remain:
+
+Economic Calendar
+       ↓
+News Filter
+       ↓
+Risk Manager
+       ↓
+Trade Manager
+       ↓
+MT5 Connector
+       ↓
+Exness
+
+The News Filter is a risk-information and trading-safety layer, not a strategy engine.
+
+10.25 IMPLEMENTATION RULE
+
+Before finishing:
+
+Inspect all existing files relevant to Sections 1–9.
+Implement Section 10 using existing project patterns.
+Do not rewrite unrelated modules.
+Do not remove existing functionality.
+Do not weaken Section 8 RiskApproval.
+Do not bypass Trade Manager.
+Do not introduce fake news data.
+Run focused Section 10 tests.
+Run the existing full test suite.
+Fix only issues caused by the Section 10 implementation.
+Provide a concise implementation report listing:
+files created,
+files modified,
+architecture integration,
+tests passed,
+any provider/live-data limitation,
+anything intentionally deferred.
+
+Do not perform a broad project refactor or audit in this task. The comprehensive audit will be performed after Sections 10–17 are complete.

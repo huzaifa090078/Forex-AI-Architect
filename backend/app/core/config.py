@@ -90,6 +90,17 @@ class Settings(BaseSettings):
     # ── News Filter ──────────────────────────────────────────────────────────
     NEWS_API_KEY: str = Field(default="")
     NEWS_FILTER_ENABLED: bool = Field(default=True)
+    # Per-impact enable/disable toggles
+    NEWS_HIGH_IMPACT_ENABLED: bool = Field(default=True)
+    NEWS_MEDIUM_IMPACT_ENABLED: bool = Field(default=True)
+    NEWS_LOW_IMPACT_ENABLED: bool = Field(default=False)
+    # Minutes before an event when trading is paused
+    NEWS_PAUSE_BEFORE_MINUTES: int = Field(default=30)
+    # Minutes after an event before trading resumes
+    NEWS_RESUME_AFTER_MINUTES: int = Field(default=15)
+    # How often (seconds) the background task refreshes news from the provider
+    NEWS_REFRESH_INTERVAL_SECONDS: int = Field(default=3600)
+    # Legacy alias kept for backward-compat — maps to NEWS_PAUSE_BEFORE_MINUTES
     NEWS_HIGH_IMPACT_BLOCK_MINUTES: int = Field(default=30)
 
     # ── Risk Management ──────────────────────────────────────────────────────

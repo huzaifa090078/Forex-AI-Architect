@@ -16,6 +16,7 @@ from app.core.database import engine, Base, AsyncSessionLocal
 from app.modules.market_scanner.live_feed import market_data_feed
 from app.modules.market_scanner.scanner import market_scanner as _market_scanner
 from app.modules.trade_manager.monitor import trade_monitor
+from app.modules.news_filter.monitor import news_monitor
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +92,32 @@ def create_app() -> FastAPI:
                     "ADD COLUMN IF NOT EXISTS close_reason VARCHAR(100)"
                 )
             )
+            # Section 10: idempotently create news_events table + indexes
+            await conn.execute(sa.text("""
+                CREATE TABLE IF NOT EXISTS news_events (
+                    id         VARCHAR PRIMARY KEY,
+                    provider   VARCHAR(50)  NOT NULL DEFAULT 'unavailable',
+                    event_name VARCHAR(255) NOT NULL,
+                    currency   VARCHAR(10)  NOT NULL,
+                    impact     VARCHAR(20)  NOT NULL,
+                    event_time TIMESTAMPTZ  NOT NULL,
+                    source     VARCHAR(100),
+                    actual     VARCHAR(50),
+                    forecast   VARCHAR(50),
+                    previous   VARCHAR(50),
+                    status     VARCHAR(20)  NOT NULL DEFAULT 'upcoming',
+                    created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ
+                )
+            """))
+            await conn.execute(sa.text("""
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_news_event_identity
+                ON news_events (provider, event_name, currency, event_time)
+            """))
+            await conn.execute(sa.text("CREATE INDEX IF NOT EXISTS ix_news_events_currency   ON news_events (currency)"))
+            await conn.execute(sa.text("CREATE INDEX IF NOT EXISTS ix_news_events_impact     ON news_events (impact)"))
+            await conn.execute(sa.text("CREATE INDEX IF NOT EXISTS ix_news_events_event_time ON news_events (event_time)"))
+            await conn.execute(sa.text("CREATE INDEX IF NOT EXISTS ix_news_events_status     ON news_events (status)"))
 
         # ── Ensure system bot user exists ────────────────────────────────────
         from app.modules.trade_manager.service import TradeService
@@ -109,13 +136,17 @@ def create_app() -> FastAPI:
         # automatically triggers a fresh scan for the affected pair.
         market_data_feed.subscribe_candles(_on_candle)
 
+        # ── News Filter monitoring (Section 10) ─────────────────────────────
+        await news_monitor.start()
+
         # ── Trade position monitoring (Section 9) ────────────────────────────
         await trade_monitor.start()
 
     @app.on_event("shutdown")
     async def on_shutdown() -> None:
-        # Stop the trade monitor before the event loop closes.
+        # Stop monitors before the event loop closes.
         await trade_monitor.stop()
+        await news_monitor.stop()
         # Stop the live feed and dispose of the DB engine.
         await market_data_feed.stop()
         await engine.dispose()

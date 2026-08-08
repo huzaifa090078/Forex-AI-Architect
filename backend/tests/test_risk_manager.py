@@ -130,6 +130,26 @@ class MockNewsFilter(INewsFilter):
     async def get_upcoming_high_impact(self) -> List[NewsEvent]:
         return []
 
+    # ── New Section 10 abstract methods (minimal stubs for test isolation) ──
+
+    def evaluate_pair(self, pair, now):
+        from app.modules.news_filter.interfaces import NewsBlockReason, PairNewsStatus
+        return PairNewsStatus(
+            pair=pair, affected=False, blocked=not self._allowed,
+            reason=NewsBlockReason.NO_RELEVANT_NEWS, provider_ok=True,
+        )
+
+    def get_affected_pairs(self, event, all_pairs=None):
+        return []
+
+    @property
+    def provider_available(self) -> bool:
+        return not self._raises
+
+    @property
+    def last_refresh(self):
+        return None
+
 
 def make_manager(news_filter=None) -> RuleBasedRiskManager:
     return RuleBasedRiskManager(news_filter=news_filter)

@@ -268,9 +268,10 @@ class BacktestOut(BaseModel):
     completed_at: Optional[datetime] = None
 
 
-# ─── News ─────────────────────────────────────────────────────────────────────
+# ─── News (Section 10) ────────────────────────────────────────────────────────
 
 class NewsItemOut(BaseModel):
+    """Legacy schema kept for backward compat — maps news_items table."""
     model_config = ConfigDict(from_attributes=True)
     id: str
     headline: str
@@ -281,6 +282,53 @@ class NewsItemOut(BaseModel):
     forecast: Optional[str] = None
     previous: Optional[str] = None
     published_at: datetime
+
+
+class NewsEventOut(BaseModel):
+    """Full Section 10 news event — maps news_events table."""
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    provider: str
+    event_name: str
+    currency: str
+    impact: str
+    event_time: datetime
+    source: Optional[str] = None
+    actual: Optional[str] = None
+    forecast: Optional[str] = None
+    previous: Optional[str] = None
+    status: str
+    # Computed fields (not stored)
+    affected_pairs: List[str] = Field(default_factory=list)
+    minutes_to_event: Optional[float] = None
+
+
+class PairNewsStatusOut(BaseModel):
+    """Result of evaluate_pair() — trading safety status for a single pair."""
+    pair: str
+    affected: bool
+    blocked: bool
+    reason: str
+    impact: Optional[str] = None
+    event_name: Optional[str] = None
+    event_time: Optional[datetime] = None
+    minutes_to_event: Optional[float] = None
+    status: Optional[str] = None
+    provider_ok: bool = True
+
+
+class NewsSystemStatusOut(BaseModel):
+    """Overall news filter system status for the dashboard."""
+    provider_available: bool
+    last_refresh: Optional[datetime] = None
+    filter_enabled: bool
+    high_impact_enabled: bool
+    medium_impact_enabled: bool
+    low_impact_enabled: bool
+    pause_before_minutes: int
+    resume_after_minutes: int
+    cached_event_count: int
+    high_impact_count: int
 
 
 # ─── Settings ─────────────────────────────────────────────────────────────────

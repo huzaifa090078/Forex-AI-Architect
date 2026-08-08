@@ -16,6 +16,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -152,7 +153,40 @@ class Backtest(Base):
     user: Mapped["User"] = relationship("User", back_populates="backtests")
 
 
-# ─── News Items ──────────────────────────────────────────────────────────────
+# ─── News Events (Section 10) ────────────────────────────────────────────────
+
+class NewsEventRecord(Base):
+    """
+    Normalised economic-calendar event persisted by the News Filter Engine.
+
+    Unique identity: (provider, event_name, currency, event_time).
+    The upsert in NewsService.upsert_event() relies on the unique constraint
+    'uq_news_event_identity' to prevent duplicate records.
+    """
+    __tablename__ = "news_events"
+    __table_args__ = (
+        UniqueConstraint(
+            "provider", "event_name", "currency", "event_time",
+            name="uq_news_event_identity",
+        ),
+    )
+
+    id:         Mapped[str]            = mapped_column(String, primary_key=True, default=_uuid)
+    provider:   Mapped[str]            = mapped_column(String(50), nullable=False, default="unavailable")
+    event_name: Mapped[str]            = mapped_column(String(255), nullable=False)
+    currency:   Mapped[str]            = mapped_column(String(10), nullable=False, index=True)
+    impact:     Mapped[str]            = mapped_column(String(20), nullable=False, index=True)
+    event_time: Mapped[datetime]       = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    source:     Mapped[Optional[str]]  = mapped_column(String(100), nullable=True)
+    actual:     Mapped[Optional[str]]  = mapped_column(String(50), nullable=True)
+    forecast:   Mapped[Optional[str]]  = mapped_column(String(50), nullable=True)
+    previous:   Mapped[Optional[str]]  = mapped_column(String(50), nullable=True)
+    status:     Mapped[str]            = mapped_column(String(20), nullable=False, default="upcoming", index=True)
+    created_at: Mapped[datetime]       = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
+
+
+# ─── News Items (legacy — kept for backward compat) ──────────────────────────
 
 class NewsItem(Base):
     __tablename__ = "news_items"
