@@ -22,6 +22,10 @@ async def get_current_user_id(
     creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
     db:    AsyncSession                         = Depends(get_db),
 ) -> str:
+    from app.core.config import settings as _cfg
+    # Dev bypass — no login required until bot goes live
+    if _cfg.APP_ENV == "development":
+        return "dev-operator"
     if not creds:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing token.")
     user_id = auth_service.decode_access_token(creds.credentials)

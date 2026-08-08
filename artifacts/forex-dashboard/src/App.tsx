@@ -1,6 +1,3 @@
-// Initialize auth token getter before any API calls
-import "@/lib/auth";
-
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/api-query-client";
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -20,25 +17,21 @@ import BacktestsPage  from '@/pages/backtests';
 import NewsPage       from '@/pages/news';
 import LogsPage       from '@/pages/logs';
 import SettingsPage   from '@/pages/settings';
-import LoginPage      from '@/pages/auth/login';
-import RegisterPage   from '@/pages/auth/register';
 
 function Router() {
   return (
     <Layout>
       <Switch>
-        <Route path="/"         component={DashboardPage} />
-        <Route path="/trades"   component={TradesPage} />
-        <Route path="/history"  component={HistoryPage} />
-        <Route path="/signals"  component={SignalsPage} />
-        <Route path="/market"   component={MarketPage} />
-        <Route path="/charts"   component={ChartsPage} />
+        <Route path="/"          component={DashboardPage} />
+        <Route path="/trades"    component={TradesPage} />
+        <Route path="/history"   component={HistoryPage} />
+        <Route path="/signals"   component={SignalsPage} />
+        <Route path="/market"    component={MarketPage} />
+        <Route path="/charts"    component={ChartsPage} />
         <Route path="/backtests" component={BacktestsPage} />
-        <Route path="/news"     component={NewsPage} />
-        <Route path="/logs"     component={LogsPage} />
-        <Route path="/settings" component={SettingsPage} />
-        <Route path="/auth/login"    component={LoginPage} />
-        <Route path="/auth/register" component={RegisterPage} />
+        <Route path="/news"      component={NewsPage} />
+        <Route path="/logs"      component={LogsPage} />
+        <Route path="/settings"  component={SettingsPage} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

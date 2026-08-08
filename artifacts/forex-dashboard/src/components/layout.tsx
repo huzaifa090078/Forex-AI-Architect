@@ -55,15 +55,9 @@ function LiveClock() {
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const [location, setLocation] = useLocation();
-  const isAuthRoute = location.startsWith("/auth");
-
-  const { data: summary, isLoading } = useGetDashboardSummary(
-    isAuthRoute ? { enabled: false } as any : undefined
-  );
-  const { connected: wsConnected } = useLivePrices(isAuthRoute ? true : false);
-
-  if (isAuthRoute) return <div className="min-h-screen bg-background">{children}</div>;
+  const [, setLocation] = useLocation();
+  const { data: summary, isLoading } = useGetDashboardSummary();
+  const { connected: wsConnected } = useLivePrices();
 
   const botStatus      = isLoading ? null : (summary?.botStatus || "stopped");
   const botStatusColor =
@@ -138,13 +132,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {/* Bottom */}
         <div className="p-3 border-t border-sidebar-border bg-sidebar/50 space-y-0.5">
           <ThemeToggle />
-          <button
-            onClick={handleSignOut}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all duration-200 w-full"
-          >
-            <LogOut className="w-4 h-4" />
-            Sign Out
-          </button>
         </div>
       </aside>
 
