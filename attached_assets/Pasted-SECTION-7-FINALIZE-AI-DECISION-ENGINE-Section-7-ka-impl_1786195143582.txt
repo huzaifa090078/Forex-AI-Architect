@@ -1,0 +1,122 @@
+SECTION 7 — FINALIZE AI DECISION ENGINE
+
+Section 7 ka implementation pehle hi ho chuka hai. Ab poora codebase dobara audit/read MAT karo. Existing Section 7 implementation ko preserve karo.
+
+GOAL:
+Section 7 ko sirf targeted verification/fixes ke through complete aur production-ready karo according to the Section 7 specification already provided in this conversation.
+
+IMPORTANT — AGENT LIMIT:
+- Entire codebase dobara scan/read mat karo.
+- Sirf Section 7 ki existing files aur directly related imports/tests inspect karo.
+- Unnecessary refactoring mat karo.
+- Existing working functionality mat remove/change karo.
+- Agar implementation requirement already satisfy karti hai to usay modify mat karo.
+- Sirf actual missing/broken requirements fix karo.
+- No new architecture.
+- No ML implementation.
+- No database migration in Section 7.
+- No unnecessary documentation.
+- Minimal targeted tests run karo.
+
+SECTION 7 REQUIRED FILES:
+- app/core/config.py
+- app/modules/ai_engine/types.py
+- app/modules/ai_engine/interfaces.py
+- app/modules/ai_engine/engine.py
+- app/modules/ai_engine/__init__.py
+- app/db/schemas.py
+- app/api/v1/ai.py
+- app/api/router.py
+- relevant Section 7 tests
+
+VERIFY THESE REQUIREMENTS:
+
+1. Decision types:
+   BUY / SELL / NO_TRADE
+
+2. Trade quality:
+   EXCELLENT / GOOD / AVERAGE / WEAK / REJECT
+
+3. TradeDecision must expose:
+   pair
+   timeframe
+   action
+   confidence
+   trade_quality
+   trend
+   smc_summary
+   indicators_summary
+   entry_price
+   entry_zone_low/high
+   stop_loss
+   take_profit_1
+   take_profit_2
+   rejection_reasons
+   evaluated_at
+   metadata
+
+4. Confidence must remain deterministic:
+   SMC 35%
+   Indicators 30%
+   MTF 20%
+   Volume 8%
+   Session 7%
+   then spread/volatility penalties.
+   Clamp final confidence to 0.0–1.0.
+
+5. Existing AI_MIN_CONFIDENCE must remain 0.75.
+
+6. Direction requires 2-of-3 agreement:
+   SMC + MTF + Scanner.
+
+7. NO_TRADE must be returned for applicable:
+   - excessive spread
+   - directional conflict
+   - weak SMC/MTF condition
+   - strong indicator conflict
+   - confidence below threshold
+   - enabled high-volatility rejection
+   - disallowed session
+
+8. Every NO_TRADE must contain rejection_reasons.
+
+9. Entry, ATR-based candidate SL and TP1/TP2 must work as specified.
+   SL = 1.5 ATR.
+   TP1 = 1R.
+   TP2 = 2R.
+   These remain candidates only; Risk Manager is responsible for final validation later.
+
+10. Graceful degradation:
+    missing MTF/confluence/individual indicators must not crash the engine.
+
+11. API:
+    GET /v1/ai/signal
+    GET /v1/ai/signals
+
+12. API response must correctly serialize TradeDecisionOut with camelCase aliases.
+
+13. AI engine must NOT directly call:
+    - MT5
+    - MarketDataService
+    - IndicatorSuite
+    - SMCAnalyzer
+    - RiskManager
+
+    Data is supplied by the caller.
+
+14. Preserve the existing ML AI scaffold/interfaces.
+
+15. No database persistence is required for Section 7.
+
+TESTING:
+Run only the existing Section 7 tests and fix genuine failures.
+If all relevant tests pass, do not create unnecessary additional tests.
+
+FINAL RESPONSE:
+Give only:
+- files changed (if any)
+- tests result
+- Section 7 status: COMPLETE / NOT COMPLETE
+- if NOT COMPLETE, list the exact blocker.
+
+Do not spend time explaining the architecture.
