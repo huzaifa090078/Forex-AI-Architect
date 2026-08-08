@@ -49,6 +49,24 @@ def _require_mt5() -> None:
         )
 
 
+def _mask_account(account: int) -> str:
+    """
+    Return a masked representation of an MT5 account number for safe logging.
+
+    Shows only the last 4 digits to aid debugging without exposing the full
+    account number in log files.  Treats accounts with fewer than 4 digits as
+    fully masked so short identifiers are never unintentionally leaked.
+
+    Examples:
+        12345678  →  "****5678"
+        123       →  "****"
+    """
+    s = str(account)
+    if len(s) <= 4:
+        return "****"
+    return f"****{s[-4:]}"
+
+
 # MT5 position-type integer → canonical direction string
 _POSITION_TYPE: Dict[int, str] = {
     0: "buy",   # POSITION_TYPE_BUY
@@ -129,7 +147,7 @@ class RealMT5Connector(IMT5Connector):
             error = await self._run(mt5.last_error)
             logger.error(
                 "mt5.login() failed — account: %s, server: %s, error: %s",
-                cfg.MT5_ACCOUNT,
+                _mask_account(cfg.MT5_ACCOUNT),
                 cfg.MT5_SERVER,
                 error,
             )
@@ -138,7 +156,7 @@ class RealMT5Connector(IMT5Connector):
 
         logger.info(
             "MT5 connected — account: %s, server: %s",
-            cfg.MT5_ACCOUNT,
+            _mask_account(cfg.MT5_ACCOUNT),
             cfg.MT5_SERVER,
         )
         return True
@@ -512,3 +530,45 @@ class RealMT5Connector(IMT5Connector):
             "volume":    int(tick.volume),
             "tick_time": datetime.fromtimestamp(tick.time, tz=timezone.utc),
         }
+
+    # ------------------------------------------------------------------
+    # RealMT5Connector — infrastructure / health
+    # ------------------------------------------------------------------
+
+    async def check_symbols(self, symbols: List[str]) -> Dict[str, bool]:
+        """
+        Check whether each symbol in `symbols` is available in the MT5 terminal.
+
+        Calls mt5.symbol_info(symbol) for every symbol concurrently and returns
+        a dict mapping each symbol to True (available) or False (not found /
+        not visible in Market Watch).
+
+        This method is intentionally NOT part of IMT5Connector — it is an
+        infrastructure / health-check operation specific to RealMT5Connector.
+        Callers that need symbol availability should downcast or hold a concrete
+        reference to RealMT5Connector.
+
+        Must be called after a successful connect(); raises RuntimeError when
+        MT5 is not available (non-Windows) or the package is absent.
+        """
+        _require_mt5()
+
+        # Fetch symbol_info for all symbols concurrently via the thread-pool
+        # executor so the async event loop is never blocked.
+        results: List[Any] = await asyncio.gather(
+            *[self._run(mt5.symbol_info, sym) for sym in symbols],
+            return_exceptions=True,
+        )
+
+        availability: Dict[str, bool] = {}
+        for sym, result in zip(symbols, results):
+            if isinstance(result, Exception):
+                logger.warning(
+                    "check_symbols: mt5.symbol_info('%s') raised %s", sym, result
+                )
+                availability[sym] = False
+            else:
+                # mt5.symbol_info returns None when the symbol is unknown.
+                availability[sym] = result is not None
+
+        return availability

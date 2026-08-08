@@ -8,8 +8,9 @@ GET /v1/market/scan?timeframe — scanner run filtered to a single timeframe
 
 import asyncio
 import logging
+import sys
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 from fastapi import APIRouter, HTTPException, Query
@@ -17,6 +18,7 @@ from fastapi import APIRouter, HTTPException, Query
 from app.db.schemas import MarketOpportunityOut, MarketPairOut
 from app.modules.market_scanner.scanner import FOREX_PAIRS, TIMEFRAMES, market_scanner as _scanner_singleton
 from app.modules.market_scanner.market_data_service import MarketDataService
+from app.modules.mt5_integration.base import RealMT5Connector, _MT5_AVAILABLE
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -172,3 +174,115 @@ async def scan(
         )
         for r in raw
     ]
+
+
+@router.get("/health")
+async def mt5_health() -> Dict[str, Any]:
+    """
+    Report the MT5/Exness connection health for this environment.
+
+    Returns a structured snapshot covering:
+
+    - **platform** — host OS (`"windows"` or `"linux"` / other).
+    - **mt5_package_available** — whether the MetaTrader5 Python package could
+      be imported.  Always ``false`` on Linux/Replit because the package
+      requires Windows (or Linux + Wine + a running MT5 terminal).
+    - **connected** — whether a live MT5 session is currently established.
+    - **environment_note** — plain-English explanation of any platform
+      limitation.  ``null`` when no limitation applies.
+    - **account** — subset of account info (balance, equity, currency,
+      leverage) when connected.  Account login/number is **never** included.
+      ``null`` when not connected.
+    - **symbol_availability** — ``{pair: bool}`` for each of the 10 configured
+      forex pairs.  Empty dict when MT5 is unavailable or not connected.
+    - **checked_at** — UTC timestamp of this health snapshot.
+
+    This endpoint never returns fake or simulated market data.  All fields
+    reflect the actual state of the MT5 terminal (or its absence).
+    """
+    platform_str = "windows" if sys.platform.startswith("win") else sys.platform
+
+    checked_at = datetime.now(timezone.utc).isoformat()
+
+    # ── MT5 package not importable (Linux / Replit environment) ──────────────
+    if not _MT5_AVAILABLE:
+        return {
+            "platform":             platform_str,
+            "mt5_package_available": False,
+            "connected":             False,
+            "environment_note": (
+                "The MetaTrader5 Python package requires Windows "
+                "(or Linux with Wine and a running MT5 terminal). "
+                "Live MT5 connectivity is not available in this Replit/Linux "
+                "environment. Deploy the backend on a Windows host with MT5 "
+                "installed and set MT5_ACCOUNT, MT5_SERVER, and the "
+                "authentication environment variables to enable live trading."
+            ),
+            "account":              None,
+            "symbol_availability":  {},
+            "checked_at":           checked_at,
+        }
+
+    # ── MT5 package available — attempt connection and gather health data ─────
+    # Use a fresh RealMT5Connector so this endpoint does not mutate the shared
+    # _data_service connection state.  On Windows this is a real connection
+    # attempt; credentials must be set in environment variables.
+    connector = RealMT5Connector()
+
+    connected = False
+    account_snapshot: Optional[Dict[str, Any]] = None
+    symbol_availability: Dict[str, bool] = {}
+    error_note: Optional[str] = None
+
+    try:
+        connected = await connector.connect()
+    except RuntimeError as exc:
+        error_note = f"MT5 connect() raised: {exc}"
+        logger.warning("mt5_health: connect failed — %s", exc)
+    except Exception as exc:
+        error_note = f"Unexpected error during MT5 connect: {type(exc).__name__}"
+        logger.error("mt5_health: unexpected connect error — %s", exc)
+
+    if connected:
+        # Account info — credentials (login) are intentionally excluded.
+        try:
+            acct = await connector.get_account_info()
+            account_snapshot = {
+                "balance":     acct.balance,
+                "equity":      acct.equity,
+                "margin":      acct.margin,
+                "free_margin": acct.free_margin,
+                "leverage":    acct.leverage,
+                "currency":    acct.currency,
+                "connected":   acct.connected,
+                # login (account number) deliberately omitted — it is a
+                # credential identifier and must not appear in API responses.
+                # server is shown for operator diagnostics only.
+                "server":      acct.server,
+            }
+        except Exception as exc:
+            logger.warning("mt5_health: get_account_info failed — %s", exc)
+            error_note = f"Connected but account_info unavailable: {type(exc).__name__}"
+
+        # Symbol availability for all 10 configured pairs.
+        try:
+            symbol_availability = await connector.check_symbols(FOREX_PAIRS)
+        except Exception as exc:
+            logger.warning("mt5_health: check_symbols failed — %s", exc)
+            # Partial failure — return what we have rather than aborting.
+
+        # Disconnect cleanly — this endpoint must not leave orphan connections.
+        try:
+            await connector.disconnect()
+        except Exception:
+            pass  # Non-fatal; terminal will clean up on next tick.
+
+    return {
+        "platform":              platform_str,
+        "mt5_package_available": True,
+        "connected":             connected,
+        "environment_note":      error_note,
+        "account":               account_snapshot,
+        "symbol_availability":   symbol_availability,
+        "checked_at":            checked_at,
+    }
