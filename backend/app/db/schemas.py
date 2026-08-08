@@ -290,3 +290,78 @@ class PaginatedLogsOut(BaseModel):
     total: int
     page: int
     limit: int
+
+
+# ─── SMC ──────────────────────────────────────────────────────────────────────
+
+class SMCStructureOut(BaseModel):
+    """
+    Response schema for a single detected SMC structure.
+
+    Covers all pattern types: BOS, CHoCH, Order Block, Breaker Block,
+    Fair Value Gap, Imbalance, Liquidity Sweep, Supply Zone, Demand Zone,
+    Mitigation Block, and Inducement.
+
+    ``zone`` reports whether price was in a Premium, Equilibrium, or Discount
+    area when the structure was detected.
+    ``strength`` is a 0.0–1.0 confidence score produced by the SMC engine.
+    ``validated`` is True when the structure has been subsequently confirmed
+    by a price reaction at the level.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    pattern:     str
+    pair:        str
+    timeframe:   str
+    zone:        str                           # "premium" | "equilibrium" | "discount"
+    price_low:   float = Field(alias="priceLow")
+    price_high:  float = Field(alias="priceHigh")
+    direction:   str                           # "bullish" | "bearish"
+    strength:    float
+    validated:   bool = False
+    detected_at: Optional[datetime] = Field(default=None, alias="detectedAt")
+    metadata:    Dict[str, Any]     = Field(default_factory=dict)
+
+
+class ConfluenceFactorOut(BaseModel):
+    """
+    Response schema for one scored component within a confluence result.
+
+    ``name``      — machine-readable factor identifier
+                    (e.g. ``"order_block_alignment"``).
+    ``score``     — points this factor contributed (0 – max_score).
+    ``max_score`` — maximum possible contribution from this factor.
+    ``confirmed`` — True when score > 0 (factor fired in the expected direction).
+    ``reason``    — one-sentence human-readable explanation of the result.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    name:      str
+    score:     float
+    max_score: float = Field(alias="maxScore")
+    confirmed: bool
+    reason:    str
+
+
+class ConfluenceResultOut(BaseModel):
+    """
+    Response schema for the normalized 0–100 SMC confluence score for a pair.
+
+    Eight independent factors are evaluated (BOS/CHoCH alignment, Order Blocks,
+    Fair Value Gaps, Liquidity Sweeps, Supply/Demand zones, Premium/Discount
+    zone, RSI-14, and EMA-20). Their max scores sum to exactly 100.
+
+    ``bias``            — overall directional bias inherited from the MTF analysis
+                          (``"bullish"`` | ``"bearish"`` | ``"neutral"``).
+    ``confirmed_count`` — number of factors where score > 0.
+    ``total_factors``   — total factor count (8 when all inputs are valid).
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    pair:            str
+    score:           int                        # 0–100
+    bias:            str                        # "bullish" | "bearish" | "neutral"
+    factors:         List[ConfluenceFactorOut]
+    confirmed_count: int      = Field(alias="confirmedCount")
+    total_factors:   int      = Field(alias="totalFactors")
+    analysed_at:     Optional[datetime] = Field(default=None, alias="analysedAt")

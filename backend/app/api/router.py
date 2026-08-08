@@ -14,6 +14,7 @@ from app.api.v1.backtests import router as backtests_router
 from app.api.v1.news import router as news_router
 from app.api.v1.settings import router as settings_router
 from app.api.v1.logs import router as logs_router
+from app.api.v1.smc import router as smc_router
 
 api_router = APIRouter()
 
@@ -34,3 +35,4 @@ api_router.include_router(backtests_router,  prefix="/v1/backtests",  tags=["bac
 api_router.include_router(news_router,       prefix="/v1/news",       tags=["news"])
 api_router.include_router(settings_router,   prefix="/v1/settings",   tags=["settings"])
 api_router.include_router(logs_router,       prefix="/v1/logs",       tags=["logs"])
+api_router.include_router(smc_router,        prefix="/v1/smc",        tags=["smc"])
