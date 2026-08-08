@@ -14,7 +14,13 @@ No trading logic.  No AI analysis.  No mock data.
 
 import asyncio
 import logging
-from typing import List, Optional
+from typing import Dict, List, Optional
+
+from app.modules.smc import (
+    ConfluenceResult,
+    MTFAnalysis,
+    SMCAnalyzer,
+)
 
 from app.modules.market_scanner.base import BaseMarketScanner
 from app.modules.market_scanner.interfaces import PriorityLevel, ScanResult
@@ -66,6 +72,15 @@ _SCANNER_INDICATORS = [EMA_20, EMA_50, RSI_14, ATR_14, VOLUME_20]
 # ── Shared IndicatorSuite ──────────────────────────────────────────────────────
 # Built once at module load.  compute_all() is stateless — sharing is safe.
 _indicator_suite = build_default_suite()
+
+# SMC timeframes supplied to analyze_multi_timeframe().
+# Must be a subset of TIMEFRAMES and of the MT5-supported set.
+_SMC_TIMEFRAMES: List[str] = ["M5", "M15", "H1", "H4"]
+
+# Shared SMCAnalyzer singleton — stateless and concurrency-safe.
+# Same pattern as _indicator_suite; safe under asyncio.gather with many
+# concurrent pair/timeframe coroutines.
+_smc_analyzer = SMCAnalyzer()
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -129,6 +144,71 @@ def _derive_priority(score: float) -> str:
     return PriorityLevel.LOW.value
 
 
+# ── SMC pattern / factor helpers ──────────────────────────────────────────────
+
+# Structural factor names in priority order for pattern label derivation.
+# RSI/EMA confirmation factors are excluded — already present in indicator labels.
+_SMC_STRUCTURAL_FACTORS: List[str] = [
+    "order_block_alignment",
+    "fvg_alignment",
+    "supply_demand_alignment",
+    "liquidity_sweep",
+    "bos_choch_alignment",
+]
+
+# Short labels used in the smc_pattern string for each structural factor.
+_SMC_FACTOR_LABELS: Dict[str, str] = {
+    "order_block_alignment":   "OB",
+    "fvg_alignment":           "FVG",
+    "supply_demand_alignment": "Zone",
+    "liquidity_sweep":         "Liq Sweep",
+    "bos_choch_alignment":     "MTF Structure",
+}
+
+
+def _derive_smc_pattern(
+    mtf: MTFAnalysis,
+    confluence: ConfluenceResult,
+    existing_pattern: str,
+) -> str:
+    """
+    Prepend the strongest confirmed SMC structural label to the existing
+    EMA-based pattern string.
+
+    Priority: OB > FVG > Supply/Demand > Liquidity Sweep > MTF Bias.
+    Returns existing_pattern unchanged when no structural factor is confirmed.
+    """
+    bias_label  = mtf.bias.value.capitalize()
+    dominant_tf = mtf.dominant_timeframe or "MTF"
+    factor_map  = {f.name: f for f in confluence.factors}
+
+    for fname in _SMC_STRUCTURAL_FACTORS:
+        factor = factor_map.get(fname)
+        if factor and factor.confirmed:
+            short = _SMC_FACTOR_LABELS.get(fname, fname)
+            return f"{bias_label} {short} ({dominant_tf}) + {existing_pattern}"
+
+    return existing_pattern
+
+
+def _derive_smc_confluence_factors(confluence: ConfluenceResult) -> List[str]:
+    """
+    Build short SMC confluence label strings from confirmed ConfluenceFactor
+    entries.
+
+    RSI and EMA factors are excluded — they are already in the scanner's
+    existing indicator label list.  Returns [] when nothing is confirmed.
+    """
+    _SKIP = {"rsi_confirmation", "ema_confirmation"}
+    result: List[str] = []
+    for f in confluence.factors:
+        if not f.confirmed or f.name in _SKIP:
+            continue
+        short = f.name.replace("_", " ").title()
+        result.append(f"SMC {short} ({f.score:.0f}/{f.max_score:.0f}pts)")
+    return result
+
+
 # ── MarketScanner ─────────────────────────────────────────────────────────────
 
 class MarketScanner(BaseMarketScanner):
@@ -169,8 +249,9 @@ class MarketScanner(BaseMarketScanner):
         Returns the result from the timeframe with the highest score,
         or None if no timeframe yields a result.
         """
+        mtf = await self._build_smc_context(pair)
         tf_results = await asyncio.gather(
-            *[self._scan_pair_timeframe(pair, tf) for tf in TIMEFRAMES],
+            *[self._scan_pair_timeframe(pair, tf, mtf) for tf in TIMEFRAMES],
             return_exceptions=False,
         )
         valid = [r for r in tf_results if r is not None]
@@ -181,7 +262,8 @@ class MarketScanner(BaseMarketScanner):
     # ── Per-timeframe scan ────────────────────────────────────────────────────
 
     async def _scan_pair_timeframe(
-        self, pair: str, timeframe: str
+        self, pair: str, timeframe: str,
+        mtf: Optional[MTFAnalysis] = None,
     ) -> Optional[ScanResult]:
         """
         Scan one pair on one timeframe.
@@ -271,6 +353,20 @@ class MarketScanner(BaseMarketScanner):
 
         price = float(bars[-1]["close"])
 
+        # ── SMC confluence scoring (uses pre-computed MTF context) ────────────
+        # score_confluence is pure computation — no IO, no detect_* calls.
+        # Failure is caught and logged at DEBUG; the scanner continues without
+        # SMC enrichment rather than discarding an otherwise valid opportunity.
+        smc_result: Optional[ConfluenceResult] = None
+        if mtf is not None:
+            try:
+                smc_result = _smc_analyzer.score_confluence(mtf, bars, price)
+            except Exception as exc:
+                logger.debug(
+                    "MarketScanner: score_confluence failed for %s/%s — %s",
+                    pair, timeframe, exc,
+                )
+
         # ── 4. Structural observations ────────────────────────────────────────
         ema_bullish       = ema20_last > ema50_last
         price_above_ema20 = price > ema20_last
@@ -330,13 +426,15 @@ class MarketScanner(BaseMarketScanner):
                 session=session,
                 confluence_factors=factors,
                 metadata={
-                    "ema20":         round(float(ema20_last), 5),
-                    "ema50":         round(float(ema50_last), 5),
-                    "ema_spread_pct": round(ema_spread_pct, 4),
-                    "rsi":           round(rsi, 2),
-                    "atr":           round(atr, 5),
-                    "price":         round(price, 5),
-                    "vol_ratio":     round(vol_ratio, 4) if vol_ratio is not None else None,
+                    "ema20":                 round(float(ema20_last), 5),
+                    "ema50":                 round(float(ema50_last), 5),
+                    "ema_spread_pct":        round(ema_spread_pct, 4),
+                    "rsi":                   round(rsi, 2),
+                    "atr":                   round(atr, 5),
+                    "price":                 round(price, 5),
+                    "vol_ratio":             round(vol_ratio, 4) if vol_ratio is not None else None,
+                    "smc_confluence_score":  smc_result.score if smc_result is not None else None,
+                    "smc_bias":              mtf.bias.value if mtf is not None else None,
                 },
             )
 
@@ -366,6 +464,15 @@ class MarketScanner(BaseMarketScanner):
             trend_status = "bearish"
             pattern      = f"EMA Bearish Structure{momentum_suffix}"
 
+        # Derive SMC-enriched pattern label.
+        # Falls back to the EMA-based pattern when SMC context is unavailable
+        # or no structural factor was confirmed — existing behavior preserved.
+        smc_pattern_label = (
+            _derive_smc_pattern(mtf, smc_result, pattern)
+            if (mtf is not None and smc_result is not None)
+            else pattern
+        )
+
         # ── 10. Priority level ────────────────────────────────────────────────
         priority_level = _derive_priority(score)
 
@@ -382,11 +489,16 @@ class MarketScanner(BaseMarketScanner):
             factors.append(f"ATR {atr_pct:.2f}%")
         factors.append(f"Vol {volume_status}")
 
+        # Append confirmed SMC structural factors.
+        # RSI/EMA SMC factors are excluded — already represented above.
+        if smc_result is not None:
+            factors.extend(_derive_smc_confluence_factors(smc_result))
+
         return ScanResult(
             pair=pair,
             direction=direction,
             score=score,
-            smc_pattern=pattern,
+            smc_pattern=smc_pattern_label,
             timeframe=timeframe,
             trend_status=trend_status,
             volatility_status=volatility_status,
@@ -397,12 +509,14 @@ class MarketScanner(BaseMarketScanner):
             session=session,
             confluence_factors=factors,
             metadata={
-                "ema20":     round(float(ema20_last), 5),
-                "ema50":     round(float(ema50_last), 5),
-                "rsi":       round(rsi, 2),
-                "atr":       round(atr, 5),
-                "price":     round(price, 5),
-                "vol_ratio": round(vol_ratio, 4) if vol_ratio is not None else None,
+                "ema20":                round(float(ema20_last), 5),
+                "ema50":                round(float(ema50_last), 5),
+                "rsi":                  round(rsi, 2),
+                "atr":                  round(atr, 5),
+                "price":                round(price, 5),
+                "vol_ratio":            round(vol_ratio, 4) if vol_ratio is not None else None,
+                "smc_confluence_score": smc_result.score if smc_result is not None else None,
+                "smc_bias":             mtf.bias.value if mtf is not None else None,
             },
         )
 
@@ -415,8 +529,21 @@ class MarketScanner(BaseMarketScanner):
         Scan all `pairs` on a single `timeframe` concurrently.
         Returns results sorted by score descending.
         """
+        # Build MTF SMC context for all pairs concurrently (one per pair).
+        mtf_fetches = await asyncio.gather(
+            *[self._build_smc_context(p) for p in pairs],
+            return_exceptions=True,
+        )
+        mtf_per_pair = [
+            None if isinstance(m, Exception) else m
+            for m in mtf_fetches
+        ]
+
         raw = await asyncio.gather(
-            *[self._scan_pair_timeframe(p, timeframe) for p in pairs],
+            *[
+                self._scan_pair_timeframe(p, timeframe, mtf)
+                for p, mtf in zip(pairs, mtf_per_pair)
+            ],
             return_exceptions=False,
         )
         results = [r for r in raw if r is not None]
@@ -426,6 +553,60 @@ class MarketScanner(BaseMarketScanner):
             timeframe, len(results), len(pairs),
         )
         return results
+
+    # ── SMC context builder ───────────────────────────────────────────────────
+
+    async def _build_smc_context(self, pair: str) -> Optional[MTFAnalysis]:
+        """
+        Fetch M5/M15/H1/H4 OHLCV bars concurrently and run MTF SMC analysis.
+
+        Returns an MTFAnalysis on success, or None when insufficient data is
+        available or any error occurs.  Never raises — a failure here must not
+        crash the scanner; affected pairs will produce results without SMC
+        enrichment.
+
+        Data source:
+          Same self._provider.get_ohlcv() as _scan_pair_timeframe; same bar
+          count (_OHLCV_COUNT = 60); same validated bar format.
+
+        Pair ownership:
+          The returned MTFAnalysis.pair is "" per the SMCAnalyzer contract.
+          The scanner does not enrich it — pair identity is carried by
+          ScanResult.pair only.
+        """
+        fetches = await asyncio.gather(
+            *[self._provider.get_ohlcv(pair, tf, _OHLCV_COUNT)
+              for tf in _SMC_TIMEFRAMES],
+            return_exceptions=True,
+        )
+
+        ohlcv_map: Dict[str, List] = {}
+        for tf, result in zip(_SMC_TIMEFRAMES, fetches):
+            if isinstance(result, Exception):
+                logger.debug(
+                    "MarketScanner._build_smc_context: %s/%s fetch failed — %s",
+                    pair, tf, result,
+                )
+            else:
+                ohlcv_map[tf] = result
+
+        if not ohlcv_map:
+            logger.debug(
+                "MarketScanner._build_smc_context: no TF data available "
+                "for %s — SMC enrichment skipped.",
+                pair,
+            )
+            return None
+
+        try:
+            return _smc_analyzer.analyze_multi_timeframe(ohlcv_map)
+        except Exception as exc:
+            logger.warning(
+                "MarketScanner._build_smc_context: analyze_multi_timeframe "
+                "failed for %s — %s",
+                pair, exc,
+            )
+            return None
 
 
 # ---------------------------------------------------------------------------
