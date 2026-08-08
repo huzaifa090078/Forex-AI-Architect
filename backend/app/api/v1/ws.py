@@ -10,8 +10,7 @@ Single shared connection per client.  Server pushes:
   • notification — trade events, news alerts, system events
 
 Client can send:
-  • {"type": "ping"}             → server replies {"type": "pong"}
-  • {"type": "subscribe_pair", "pair": "EURUSD"}   → ignored (all pairs are always streamed)
+  • {"type": "ping"}  → server replies {"type": "pong"}
 
 Security: no credentials are ever sent through WebSocket frames.
 """
@@ -33,14 +32,31 @@ from app.modules.market_scanner.scanner import FOREX_PAIRS
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+# ── In-memory tick cache (pair → last tick dict) ──────────────────────────────
+_tick_cache: Dict[str, Dict[str, Any]] = {}
+
+
+async def _on_tick(pair: str, tick: dict) -> None:
+    """Subscriber callback — stores latest tick per pair."""
+    _tick_cache[pair] = tick
+
+
+def _register_ws_subscriber() -> None:
+    """Subscribe to live feed once at startup."""
+    market_data_feed.subscribe_ticks(_on_tick)
+
+
+# Called from main.py startup
+register_ws_subscriber = _register_ws_subscriber
+
 # Tick interval for pushing prices (seconds)
 _TICK_INTERVAL   = 3.0
 _STATUS_INTERVAL = 10.0
 
 
 def _make_tick_frame(pair: str) -> Optional[Dict[str, Any]]:
-    """Build a tick frame from live_feed cache. Returns None if no data."""
-    tick = market_data_feed.get_last_tick(pair)
+    """Build a tick frame from the in-memory cache. Returns None if no data yet."""
+    tick = _tick_cache.get(pair)
     if tick is None:
         return None
     return {
@@ -56,7 +72,6 @@ def _make_tick_frame(pair: str) -> Optional[Dict[str, Any]]:
 def _make_status_frame() -> Dict[str, Any]:
     """Build a status frame — never includes credentials."""
     from app.modules.news_filter.monitor import news_monitor
-    from app.modules.market_scanner.live_feed import market_data_feed
 
     task = getattr(news_monitor, "_task", None)
     if task is None:
@@ -67,12 +82,12 @@ def _make_status_frame() -> Dict[str, Any]:
         bot_status = "running"
 
     return {
-        "type":              "status",
-        "bot_status":        bot_status,
-        "news_filter_ok":    news_filter.provider_available,
-        "mt5_available":     False,          # Linux/Replit: always false; Windows backend fills this
-        "last_refresh":      news_filter.last_refresh.isoformat() if news_filter.last_refresh else None,
-        "time":              datetime.now(timezone.utc).isoformat(),
+        "type":           "status",
+        "bot_status":     bot_status,
+        "news_filter_ok": news_filter.provider_available,
+        "mt5_available":  False,   # Linux/Replit: always false
+        "last_refresh":   news_filter.last_refresh.isoformat() if news_filter.last_refresh else None,
+        "time":           datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -88,7 +103,7 @@ async def websocket_endpoint(ws: WebSocket) -> None:
         while True:
             now = asyncio.get_event_loop().time()
 
-            # ── push status ──
+            # ── push status ──────────────────────────────────────────────────
             if now - last_status_push >= _STATUS_INTERVAL:
                 try:
                     await ws.send_json(_make_status_frame())
@@ -96,7 +111,7 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                 except Exception:
                     break
 
-            # ── push ticks ──
+            # ── push ticks ───────────────────────────────────────────────────
             if now - last_tick_push >= _TICK_INTERVAL:
                 for pair in FOREX_PAIRS:
                     frame = _make_tick_frame(pair)
@@ -107,13 +122,16 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                             break
                 last_tick_push = now
 
-            # ── non-blocking receive (handle ping/pong) ──
+            # ── non-blocking receive (ping/pong) ─────────────────────────────
             try:
                 msg_text = await asyncio.wait_for(ws.receive_text(), timeout=0.05)
                 try:
                     msg = json.loads(msg_text)
                     if msg.get("type") == "ping":
-                        await ws.send_json({"type": "pong", "time": datetime.now(timezone.utc).isoformat()})
+                        await ws.send_json({
+                            "type": "pong",
+                            "time": datetime.now(timezone.utc).isoformat(),
+                        })
                 except json.JSONDecodeError:
                     pass
             except asyncio.TimeoutError:

@@ -142,6 +142,10 @@ def create_app() -> FastAPI:
         # ── News Filter monitoring (Section 10) ─────────────────────────────
         await news_monitor.start()
 
+        # Section 11: register WebSocket tick subscriber
+        from app.api.v1.ws import register_ws_subscriber
+        register_ws_subscriber()
+
         # ── Trade position monitoring (Section 9) ────────────────────────────
         await trade_monitor.start()
 

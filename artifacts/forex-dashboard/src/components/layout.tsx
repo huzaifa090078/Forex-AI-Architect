@@ -55,12 +55,14 @@ function LiveClock() {
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const [location] = useLocation();
-  const { data: summary, isLoading } = useGetDashboardSummary();
-  const { connected: wsConnected } = useLivePrices();
-  const [, setLocation] = useLocation();
-
+  const [location, setLocation] = useLocation();
   const isAuthRoute = location.startsWith("/auth");
+
+  const { data: summary, isLoading } = useGetDashboardSummary(
+    isAuthRoute ? { enabled: false } as any : undefined
+  );
+  const { connected: wsConnected } = useLivePrices(isAuthRoute ? true : false);
+
   if (isAuthRoute) return <div className="min-h-screen bg-background">{children}</div>;
 
   const botStatus      = isLoading ? null : (summary?.botStatus || "stopped");

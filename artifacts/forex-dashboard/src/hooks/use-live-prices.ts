@@ -18,7 +18,7 @@ export type PriceTick = {
 
 export type LivePriceMap = Record<string, PriceTick>;
 
-export function useLivePrices(): {
+export function useLivePrices(disabled = false): {
   prices:    LivePriceMap;
   connected: boolean;
   botStatus: string | null;
@@ -49,7 +49,7 @@ export function useLivePrices(): {
     }
   }, []);
 
-  const { connected } = useWebSocket({ onMessage: handleMessage });
+  const { connected } = useWebSocket({ onMessage: handleMessage, enabled: !disabled });
 
   return { prices, connected, botStatus };
 }
