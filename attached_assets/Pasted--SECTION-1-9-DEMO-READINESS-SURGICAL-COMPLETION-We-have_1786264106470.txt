@@ -1,0 +1,568 @@
+# SECTION 1–9 — DEMO READINESS SURGICAL COMPLETION
+
+We have already completed a full read-only audit of Sections 1–9.
+
+The audit identified specific blockers and high-priority safety issues.
+
+Now IMPLEMENT ONLY those identified issues.
+
+Do NOT perform another broad audit.
+
+Do NOT redesign the architecture.
+
+Do NOT rewrite completed modules.
+
+Do NOT modify Sections 1–9 functionality unless required for the fixes below.
+
+Preserve all existing working behavior.
+
+---
+
+# PRIMARY GOAL
+
+Make the existing Sections 1–9 bot operationally ready for controlled **Exness demo trading**.
+
+The required execution chain must become:
+
+```text
+Market Data
+    ↓
+Market Scanner
+    ↓
+AI Engine
+    ↓
+Risk Manager
+    ↓
+RiskApproval
+    ↓
+Trade Manager
+    ↓
+MT5 Connector
+    ↓
+Exness Demo Account
+```
+
+The bot must still NEVER:
+
+* bypass Risk Manager
+* execute without RiskApproval
+* let AI directly execute trades
+* let Scanner execute trades
+* calculate risk inside Trade Manager
+* bypass MT5 connector
+* execute pending orders
+* introduce future Section features
+
+---
+
+# TASK 1 — IMPLEMENT AUTOMATED E2E TRADING PIPELINE
+
+This is the main blocker.
+
+Current problem:
+
+`MarketDataFeed → Scanner` exists, but the candle callback only scans/logs results.
+
+Implement the missing runtime pipeline.
+
+The pipeline should consume valid scanner opportunities and process them through:
+
+```text
+ScanResult
+    ↓
+AI Engine
+    ↓
+AI decision
+    ↓
+Risk Manager
+    ↓
+RiskApproval
+    ↓
+Trade Manager
+```
+
+## Requirements
+
+Use the EXISTING interfaces and concrete implementations.
+
+Do NOT create duplicate AI/Risk/Trade abstractions.
+
+Do NOT bypass existing APIs/interfaces.
+
+Do NOT move risk calculations into another module.
+
+Do NOT let the scanner decide whether to trade.
+
+The scanner only identifies candidates.
+
+The AI engine makes the trading decision.
+
+Risk Manager provides final approval.
+
+Trade Manager executes only after valid RiskApproval.
+
+---
+
+## Pipeline behavior
+
+When a new completed candle triggers the scanner:
+
+1. Scan the relevant pair/timeframe.
+2. Ignore `None` / invalid opportunities.
+3. Pass valid candidate data into the existing AI Engine.
+4. If AI does not approve / confidence is insufficient:
+
+   * stop processing
+   * do NOT call Risk Manager for execution
+   * do NOT execute a trade.
+5. If AI approves:
+
+   * obtain the AI direction/entry/SL/TP data required by the existing architecture.
+6. Pass the proposed trade into Risk Manager.
+7. Risk Manager performs the complete existing Section 8 approval.
+8. If Risk Manager rejects:
+
+   * do NOT call Trade Manager broker execution.
+   * log the rejection reason.
+9. If Risk Manager approves:
+
+   * pass the immutable `RiskApproval` into Trade Manager.
+10. Trade Manager executes through the existing MT5 connector only.
+
+---
+
+# IMPORTANT — DO NOT INVENT MISSING AI DATA
+
+Before connecting the pipeline, use the EXISTING AI/SMC/Scanner types.
+
+If AI currently requires a feature vector or SMC context:
+
+* construct it using the existing feature extraction architecture
+* reuse existing indicators/SMC results
+* do not invent a second feature system
+
+If an existing method already performs part of this workflow, reuse it.
+
+---
+
+# DUPLICATE EXECUTION PROTECTION
+
+The candle callback must not accidentally execute the same opportunity multiple times.
+
+Use the existing Trade Manager duplicate protection.
+
+Do not create a second duplicate-trade system unless absolutely necessary.
+
+The same candle event should not trigger multiple executions because of repeated callbacks/tasks.
+
+---
+
+# TASK 2 — SECURE TRADE-MUTATING API ENDPOINTS
+
+Audit found missing authentication on:
+
+```text
+POST /v1/trades/{id}/close
+PATCH /v1/trades/{id}
+DELETE /v1/trades/{id}
+```
+
+Add the existing authentication dependency:
+
+`get_current_user_id`
+
+to all trade-mutating endpoints.
+
+Use the project's existing authentication mechanism.
+
+Do NOT create another authentication system.
+
+Do NOT change authentication behavior for unrelated endpoints.
+
+Unauthenticated requests must be rejected.
+
+Authenticated requests should preserve current behavior.
+
+---
+
+# TASK 3 — REMOVE DEMO-INSECURE AUTH BYPASS
+
+Current:
+
+`APP_ENV=development`
+
+causes:
+
+`get_current_user_id()` → `"dev-operator"`
+
+without authentication.
+
+This is acceptable only for local development.
+
+Make the application safe for demo/staging operation.
+
+Requirements:
+
+* Do NOT remove the development convenience completely if existing tests/development depend on it.
+* Ensure production/staging does NOT use the dev bypass.
+* Verify that `APP_ENV=staging` and `APP_ENV=production` require real authentication.
+* Preserve normal development behavior where appropriate.
+* Do NOT hardcode production credentials.
+
+If the existing configuration already supports production/staging, use it instead of creating a new mechanism.
+
+---
+
+# TASK 4 — WIRE NEWS FILTER INTO RISK MANAGER
+
+Audit found:
+
+`/v1/risk/approve`
+
+creates:
+
+`RuleBasedRiskManager()`
+
+without the existing news filter.
+
+Fix this.
+
+Reuse the existing:
+
+* `INewsFilter`
+* concrete news filter/provider architecture
+* existing dependency/singleton if available
+
+Do NOT create a new news engine.
+
+Do NOT implement an external news provider in this task.
+
+The current unavailable/deferred provider behavior must remain fail-safe.
+
+When:
+
+`NEWS_FILTER_ENABLED=True`
+
+and the news filter cannot safely determine that trading is allowed:
+
+**Risk Manager must fail closed.**
+
+---
+
+# TASK 5 — TRADE MANAGER BROKER/DB FAILURE SAFETY
+
+Audit identified:
+
+After:
+
+```text
+MT5 send_market_order()
+```
+
+succeeds, if DB persistence fails, the broker position can become untracked.
+
+Improve this without redesigning Trade Manager.
+
+At minimum:
+
+* detect DB persistence failure explicitly
+* log it as CRITICAL
+* make the position recoverable through the existing `sync_open_positions()` reconciliation mechanism
+* ensure the exception does not silently disappear
+* ensure the system does not falsely report a successfully persisted trade when DB save failed
+
+Prefer the existing reconciliation architecture over creating a completely new subsystem.
+
+Do not attempt unsafe automatic broker rollback unless the existing architecture already supports it safely.
+
+---
+
+# TASK 6 — DUPLICATE TRADE RACE PROTECTION
+
+Current duplicate protection is read-before-write.
+
+Improve it enough to prevent obvious concurrent duplicate execution.
+
+Prefer an existing DB/transaction mechanism.
+
+If a database constraint is required:
+
+* use a safe PostgreSQL-compatible constraint/index
+* preserve legitimate closed historical trades
+* only prevent the duplicate condition required by current configuration
+* create the required Alembic migration if schema changes are necessary
+
+Do NOT delete existing data.
+
+Do NOT reset the database.
+
+Do NOT modify Neon manually.
+
+---
+
+# TASK 7 — TRADE MODIFICATION VALIDATION
+
+Current `modify_trade()` can reach `modify_position()` without sufficient SL/TP validation.
+
+Add validation for:
+
+* positive SL/TP values
+* direction consistency
+* protective SL side
+* TP relative to entry
+* invalid zero/negative values
+* malformed prices
+
+Do NOT bypass Risk Manager for the original trade approval.
+
+IMPORTANT:
+
+Do not unnecessarily require a completely new RiskApproval for every harmless administrative modification if the existing Section 9 architecture explicitly allows manual SL/TP updates.
+
+However, never allow a modification that violates basic safety/integrity rules.
+
+Use existing validation utilities where possible.
+
+---
+
+# TASK 8 — BACKTEST API STATUS
+
+Current backtest endpoints raise:
+
+`NotImplementedError`
+
+Do not implement the backtesting engine.
+
+Change only the HTTP behavior so that intentionally unimplemented endpoints return an appropriate `501 Not Implemented` response instead of an uncaught HTTP 500.
+
+Do not modify the existing backtesting architecture.
+
+---
+
+# TASK 9 — STARTUP SAFETY
+
+Audit identified:
+
+* `create_all()` on startup
+* raw `ALTER TABLE` startup SQL
+
+Alembic is already configured and Neon is already migrated.
+
+Do NOT blindly remove anything.
+
+First determine whether these startup operations are still required for compatibility.
+
+If they duplicate Alembic-managed schema changes:
+
+* remove the duplicate schema mutation from normal startup
+* rely on the existing Alembic migration chain
+* preserve clean startup
+
+Do NOT run destructive migrations.
+
+Do NOT recreate tables.
+
+Do NOT change existing Neon data.
+
+The migration head must remain intact.
+
+---
+
+# TASK 10 — DO NOT CHANGE THESE
+
+Do NOT modify completed behavior of:
+
+* MT5 Connector
+* Market Data architecture
+* Market Scanner requirements
+* Indicators
+* SMC
+* AI Engine logic
+* Risk calculation rules
+* RiskApproval security model
+* Trade Manager execution model
+* Neon database architecture
+* Authentication architecture
+
+unless directly necessary for one of the fixes above.
+
+Do NOT implement:
+
+* pending orders
+* trailing stop
+* partial close
+* scale in/out
+* multi-TP
+* correlation engine
+* auto re-entry
+* AI exit signals
+* hedging
+* real external news provider
+* ML training
+* new backtesting engine
+
+These remain future/deferred scope.
+
+---
+
+# TASK 11 — TESTING
+
+After implementation:
+
+1. Run focused tests for every modified area.
+2. Run the complete test suite.
+3. Start the API server.
+4. Verify clean startup.
+5. Verify the trade monitor starts correctly.
+6. Verify the market feed starts correctly.
+7. Verify the new E2E callback/pipeline wiring imports successfully.
+8. Verify unauthenticated trade mutation requests are rejected.
+9. Verify authenticated requests still work.
+10. Verify RiskApproval cannot be bypassed.
+11. Verify AI rejection never reaches Risk Manager execution.
+12. Verify Risk rejection never reaches Trade Manager execution.
+13. Verify only approved trades reach broker execution.
+14. Verify backtest endpoints return 501.
+15. Verify Alembic remains at the correct migration head.
+
+For MT5-dependent tests:
+
+* do not fake a successful broker connection
+* use existing test doubles/mocks where already established
+* clearly distinguish Windows/MT5 environment limitations
+
+---
+
+# TASK 12 — DEMO SAFETY VERIFICATION
+
+Before declaring completion, verify this exact security chain:
+
+```text
+AI rejects
+    → NO TRADE
+
+AI approves
+    ↓
+Risk Manager rejects
+    → NO TRADE
+
+Risk Manager approves
+    ↓
+RiskApproval created
+    ↓
+Trade Manager validates token
+    ↓
+MT5 Connector
+    ↓
+Broker
+```
+
+Verify that there is NO alternative path from:
+
+* Scanner → Broker
+* AI → Broker
+* API → Broker without RiskApproval
+* Trade Manager → Broker without RiskApproval
+
+---
+
+# FINAL REPORT
+
+After implementation, return a concise completion report with:
+
+## SECTION 1–9 DEMO READINESS IMPLEMENTATION
+
+### Changes Made
+
+List only actual files changed and why.
+
+### E2E Pipeline
+
+Show the actual connected runtime path:
+
+```text
+Market Data
+→ Scanner
+→ AI
+→ Risk Manager
+→ RiskApproval
+→ Trade Manager
+→ MT5
+→ Exness
+```
+
+Mark each connection as verified.
+
+### Security
+
+Confirm:
+
+* trade mutation auth
+* dev bypass behavior
+* RiskApproval enforcement
+* no broker bypass
+
+### Safety Fixes
+
+List the Trade Manager/DB/risk fixes completed.
+
+### Tests
+
+Give exact:
+
+* passed
+* failed
+* skipped
+
+Explain any remaining failures.
+
+### Runtime
+
+Confirm:
+
+* application startup
+* Neon connection/configuration
+* background workers
+* trade monitor
+* market feed
+
+### Remaining Demo Blockers
+
+Only list actual blockers still remaining.
+
+Do NOT call future features blockers.
+
+### Final Decision
+
+Answer exactly one:
+
+**DEMO READY**
+
+or
+
+**DEMO READY — WINDOWS/MT5 SETUP REMAINING**
+
+or
+
+**NOT DEMO READY**
+
+If something remains environment-only, clearly separate it from code blockers.
+
+---
+
+# ABSOLUTE RULES
+
+* Do not perform another broad audit.
+* Do not ask for permission between tasks.
+* Do not stop after finding an issue.
+* Implement all tasks above in one continuous pass.
+* Do not make unrelated improvements.
+* Do not redesign completed modules.
+* Do not delete functionality.
+* Do not weaken Risk Manager.
+* Do not weaken TradeApproval/RiskApproval security.
+* Do not bypass MT5 connector.
+* Do not touch Neon data destructively.
+* Do not commit or push to GitHub unless explicitly requested.
+* Preserve Sections 1–9 architecture.
+* Finish with tests and runtime verification.

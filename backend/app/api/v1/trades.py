@@ -33,6 +33,7 @@ from app.db.schemas import (
     ManualCloseIn,
     TradeExecutionResultOut,
 )
+from app.api.v1.auth import get_current_user_id
 from app.modules.trade_manager.service import TradeService
 from app.modules.trade_manager.manager import trade_manager
 
@@ -189,6 +190,7 @@ async def update_trade(
     payload: TradeUpdate,
     id: str = Path(...),
     db: AsyncSession = Depends(get_db),
+    _user_id: str = Depends(get_current_user_id),   # Task 2: auth guard
 ) -> TradeOut:
     """
     Update SL, TP, notes, or close/cancel a trade record.
@@ -228,6 +230,7 @@ async def update_trade(
 async def delete_trade(
     id: str = Path(...),
     db: AsyncSession = Depends(get_db),
+    _user_id: str = Depends(get_current_user_id),   # Task 2: auth guard
 ) -> Response:
     """
     Delete a trade record.
@@ -259,6 +262,7 @@ async def close_trade(
     id: str = Path(...),
     payload: ManualCloseIn = ManualCloseIn(),
     db: AsyncSession = Depends(get_db),
+    _user_id: str = Depends(get_current_user_id),   # Task 2: auth guard
 ) -> TradeExecutionResultOut:
     """
     Manually close an open position via the broker.

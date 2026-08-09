@@ -166,41 +166,59 @@ class ConcreteTradeManager(BaseTradeManager):
 
         rr = getattr(request.risk_approval, "rr_ratio", None)
 
-        # ── 7. Persist to DB ──────────────────────────────────────────────────
-        try:
-            async with AsyncSessionLocal() as db:
-                await TradeService.create_trade(db, {
-                    "user_id":          settings.TRADE_BOT_USER_ID,
-                    "pair":             request.pair.upper(),
-                    "direction":        request.direction,
-                    "entry_price":      fill_price,
-                    "stop_loss":        request.stop_loss,
-                    "take_profit":      request.take_profit,
-                    "lot_size":         exec_volume,
-                    "status":           "open",
-                    "broker_order_id":  ticket,
-                    "opened_at":        fill_time,
-                    "signal_id":        request.signal_id,
-                    "notes":            request.notes or None,
-                    "risk_reward_ratio": rr,
-                })
-        except Exception as exc:
-            # Trade executed on broker but DB persist failed — critical for audit
-            logger.critical(
-                "CRITICAL: Trade executed on broker (ticket=%s, pair=%s) but DB persist failed: %s",
-                ticket, request.pair, exc,
-            )
+        # ── 7. Persist to DB (with one retry — Task 5) ───────────────────────
+        trade_record = {
+            "user_id":           settings.TRADE_BOT_USER_ID,
+            "pair":              request.pair.upper(),
+            "direction":         request.direction,
+            "entry_price":       fill_price,
+            "stop_loss":         request.stop_loss,
+            "take_profit":       request.take_profit,
+            "lot_size":          exec_volume,
+            "status":            "open",
+            "broker_order_id":   ticket,
+            "opened_at":         fill_time,
+            "signal_id":         request.signal_id,
+            "notes":             request.notes or None,
+            "risk_reward_ratio": rr,
+        }
+        db_persisted = False
+        db_error: Optional[str] = None
+        for attempt in range(2):  # initial attempt + 1 retry
+            try:
+                async with AsyncSessionLocal() as db:
+                    await TradeService.create_trade(db, trade_record)
+                db_persisted = True
+                break
+            except Exception as exc:
+                db_error = str(exc)
+                if attempt == 0:
+                    logger.warning(
+                        "open_trade: DB persist attempt 1 failed (ticket=%s pair=%s) — retrying: %s",
+                        ticket, request.pair, exc,
+                    )
+                else:
+                    logger.critical(
+                        "CRITICAL: Trade executed on broker (ticket=%s pair=%s) but DB persist "
+                        "FAILED after retry — position is untracked. Manual recovery required. "
+                        "Error: %s",
+                        ticket, request.pair, exc,
+                    )
 
         logger.info(
-            "open_trade: executed pair=%s direction=%s lot=%.2f ticket=%s fill=%.5f",
-            request.pair, request.direction, exec_volume, ticket, fill_price,
+            "open_trade: executed pair=%s direction=%s lot=%.2f ticket=%s fill=%.5f db_ok=%s",
+            request.pair, request.direction, exec_volume, ticket, fill_price, db_persisted,
         )
+        result_meta: Dict[str, Any] = {**broker_resp, "executed_volume": exec_volume}
+        if not db_persisted:
+            result_meta["db_persist_failed"] = True
+            result_meta["db_error"] = db_error
         return OrderResult(
             success=True,
             broker_order_id=ticket,
             fill_price=fill_price,
             fill_time=fill_time,
-            metadata={**broker_resp, "executed_volume": exec_volume},
+            metadata=result_meta,
         )
 
     async def close_trade(self, trade_id: str, reason: str) -> OrderResult:
@@ -285,6 +303,7 @@ class ConcreteTradeManager(BaseTradeManager):
     ) -> bool:
         """
         Modify the SL and/or TP on an open position.
+        Validates price levels before forwarding to broker.
         Calls the broker first; updates the DB only on ACK.
         """
         if stop_loss is None and take_profit is None:
@@ -303,6 +322,50 @@ class ConcreteTradeManager(BaseTradeManager):
         if not trade.broker_order_id:
             logger.warning("modify_trade: trade %s has no broker ticket", trade_id)
             return False
+
+        # ── Task 7: SL/TP validation ──────────────────────────────────────────
+        entry     = trade.entry_price
+        direction = trade.direction
+
+        if stop_loss is not None:
+            if stop_loss <= 0 or not math.isfinite(stop_loss):
+                logger.warning(
+                    "modify_trade: invalid SL=%.5f for trade %s — must be a positive finite number",
+                    stop_loss, trade_id,
+                )
+                return False
+            if direction == "buy" and stop_loss >= entry:
+                logger.warning(
+                    "modify_trade: SL=%.5f must be below entry=%.5f for BUY trade %s",
+                    stop_loss, entry, trade_id,
+                )
+                return False
+            if direction == "sell" and stop_loss <= entry:
+                logger.warning(
+                    "modify_trade: SL=%.5f must be above entry=%.5f for SELL trade %s",
+                    stop_loss, entry, trade_id,
+                )
+                return False
+
+        if take_profit is not None:
+            if take_profit <= 0 or not math.isfinite(take_profit):
+                logger.warning(
+                    "modify_trade: invalid TP=%.5f for trade %s — must be a positive finite number",
+                    take_profit, trade_id,
+                )
+                return False
+            if direction == "buy" and take_profit <= entry:
+                logger.warning(
+                    "modify_trade: TP=%.5f must be above entry=%.5f for BUY trade %s",
+                    take_profit, entry, trade_id,
+                )
+                return False
+            if direction == "sell" and take_profit >= entry:
+                logger.warning(
+                    "modify_trade: TP=%.5f must be below entry=%.5f for SELL trade %s",
+                    take_profit, entry, trade_id,
+                )
+                return False
 
         try:
             ticket = int(trade.broker_order_id)

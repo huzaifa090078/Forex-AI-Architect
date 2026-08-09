@@ -2,21 +2,22 @@
 AI Forex Trading Bot — FastAPI Application Entry Point
 """
 
+import asyncio
 import logging
 import os
 
-import sqlalchemy as sa
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.core.config import settings
-from app.core.database import engine, Base, AsyncSessionLocal
+from app.core.database import engine, AsyncSessionLocal
 from app.modules.market_scanner.live_feed import market_data_feed
 from app.modules.market_scanner.scanner import market_scanner as _market_scanner
 from app.modules.trade_manager.monitor import trade_monitor
 from app.modules.news_filter.monitor import news_monitor
+from app.modules.trading_pipeline import run_pipeline_for_scan
 
 logger = logging.getLogger(__name__)
 
@@ -59,18 +60,24 @@ def create_app() -> FastAPI:
         Candle event callback — automatically triggered by MarketDataFeed
         whenever a new completed candle is detected for any pair/timeframe.
 
-        Re-scans the affected pair across all timeframes so the best
-        opportunity is always up-to-date without polling.
+        Sequence:
+          1. Scanner re-evaluates the affected pair.
+          2. If a directional opportunity is found the full AI → Risk → Trade
+             pipeline fires in a background task (non-blocking).
         """
         try:
             result = await _market_scanner.scan_pair(pair)
             if result is not None:
                 logger.info(
-                    "Candle scan [%s/%s]: %s → %s score=%.2f priority=%s session=%s",
+                    "Candle scan [%s/%s]: direction=%s score=%.2f priority=%s session=%s",
                     pair, timeframe,
-                    result.pair, result.direction,
-                    result.score, result.priority_level, result.session,
+                    result.direction, result.score,
+                    result.priority_level, result.session,
                 )
+                # Task 1: fire full AI → Risk → Trade pipeline as a background
+                # task so the candle callback returns immediately.
+                if result.direction in ("buy", "sell"):
+                    asyncio.create_task(run_pipeline_for_scan(result))
         except Exception as exc:
             logger.error(
                 "Candle-triggered scan failed for %s/%s: %s", pair, timeframe, exc
@@ -78,49 +85,11 @@ def create_app() -> FastAPI:
 
     @app.on_event("startup")
     async def on_startup() -> None:
-        # ── Schema bootstrap (dev convenience; use Alembic in production) ──
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-            # Section 9: idempotently add close_price / close_reason columns
-            # to existing DBs that pre-date the migration.
-            await conn.execute(
-                sa.text(
-                    "ALTER TABLE trades "
-                    "ADD COLUMN IF NOT EXISTS close_price FLOAT"
-                )
-            )
-            await conn.execute(
-                sa.text(
-                    "ALTER TABLE trades "
-                    "ADD COLUMN IF NOT EXISTS close_reason VARCHAR(100)"
-                )
-            )
-            # Section 10: idempotently create news_events table + indexes
-            await conn.execute(sa.text("""
-                CREATE TABLE IF NOT EXISTS news_events (
-                    id         VARCHAR PRIMARY KEY,
-                    provider   VARCHAR(50)  NOT NULL DEFAULT 'unavailable',
-                    event_name VARCHAR(255) NOT NULL,
-                    currency   VARCHAR(10)  NOT NULL,
-                    impact     VARCHAR(20)  NOT NULL,
-                    event_time TIMESTAMPTZ  NOT NULL,
-                    source     VARCHAR(100),
-                    actual     VARCHAR(50),
-                    forecast   VARCHAR(50),
-                    previous   VARCHAR(50),
-                    status     VARCHAR(20)  NOT NULL DEFAULT 'upcoming',
-                    created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-                    updated_at TIMESTAMPTZ
-                )
-            """))
-            await conn.execute(sa.text("""
-                CREATE UNIQUE INDEX IF NOT EXISTS uq_news_event_identity
-                ON news_events (provider, event_name, currency, event_time)
-            """))
-            await conn.execute(sa.text("CREATE INDEX IF NOT EXISTS ix_news_events_currency   ON news_events (currency)"))
-            await conn.execute(sa.text("CREATE INDEX IF NOT EXISTS ix_news_events_impact     ON news_events (impact)"))
-            await conn.execute(sa.text("CREATE INDEX IF NOT EXISTS ix_news_events_event_time ON news_events (event_time)"))
-            await conn.execute(sa.text("CREATE INDEX IF NOT EXISTS ix_news_events_status     ON news_events (status)"))
+        # ── Schema is managed entirely by Alembic migrations ────────────────
+        # Run `alembic upgrade head` before starting the server to apply any
+        # pending migrations.  create_all() and raw ALTER TABLE DDL have been
+        # removed — they conflict with Alembic's version tracking and would
+        # silently hide unapplied migrations in production.
 
         # ── Ensure system bot user exists ────────────────────────────────────
         from app.modules.trade_manager.service import TradeService

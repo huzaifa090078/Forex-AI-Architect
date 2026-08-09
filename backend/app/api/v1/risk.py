@@ -26,6 +26,7 @@ from app.db.schemas import (
 )
 from app.modules.market_scanner.market_data_service import MarketDataService
 from app.modules.mt5_integration.base import RealMT5Connector
+from app.modules.news_filter import news_filter as _news_filter
 from app.modules.risk_manager.manager import RuleBasedRiskManager
 from app.modules.risk_manager.types import ProtectionState
 
@@ -34,7 +35,7 @@ logger   = logging.getLogger(__name__)
 
 # Module-level singletons (mirrors the pattern in ai.py)
 _connector = RealMT5Connector()
-_manager   = RuleBasedRiskManager()   # no news filter wired yet — Section 13
+_manager   = RuleBasedRiskManager(news_filter=_news_filter)  # Task 4: news filter wired in
 
 
 def _protection_state_to_out(ps: ProtectionState) -> ProtectionStateOut:
