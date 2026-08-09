@@ -1,0 +1,675 @@
+# FINAL PRE-DEMO BOT AUDIT — READ-ONLY / NO CODE CHANGES
+
+We are now preparing this bot for **demo trading**.
+
+Perform ONE complete, end-to-end audit of the existing codebase.
+
+## CRITICAL RULE
+
+**THIS IS AN AUDIT ONLY.**
+
+Do NOT modify, create, delete, refactor, migrate, format, or rewrite any source file.
+
+Do NOT automatically fix anything.
+
+Do NOT install packages.
+
+Do NOT change configuration or secrets.
+
+Do NOT create commits or push to GitHub.
+
+If you find a problem, report it precisely.
+
+We want to preserve the current architecture and avoid wasting agent/tool usage.
+
+---
+
+# AUDIT SCOPE
+
+Audit the entire currently implemented bot, especially:
+
+1. Existing project architecture
+2. Database / Neon PostgreSQL
+3. MT5 / Exness integration
+4. Market Data
+5. Market Scanner
+6. Technical Indicators
+7. SMC Engine
+8. AI Engine
+9. Risk Manager
+10. Trade Manager
+11. API layer
+12. Authentication/security
+13. Background workers/tasks
+14. Configuration/environment
+15. Alembic migrations
+16. Tests
+17. Application startup/shutdown
+18. AI → Risk → Trade → MT5 execution chain
+
+Do NOT assume previous completion reports are correct. Verify the actual code.
+
+---
+
+# IMPORTANT: SECTION BOUNDARY
+
+Treat the following as the current implemented roadmap scope:
+
+* Sections 1–9
+
+Some future features were intentionally deferred.
+
+Do NOT mark explicitly deferred/future features as bugs.
+
+Examples of known future/deferred scope include things such as:
+
+* correlation protection if not implemented by current architecture
+* trailing stop if explicitly future
+* pending orders
+* partial close
+* scale in/out
+* multi-TP
+* smart trailing
+* auto re-entry
+* AI exit signals
+* hedging
+* real news provider if its provider belongs to a later section
+* other features explicitly documented as future scope
+
+However, if a deferred feature is actually required for safe demo operation according to the current architecture, flag it separately as:
+
+**DEMO BLOCKER**
+
+Do not silently implement it.
+
+---
+
+# AUDIT OBJECTIVES
+
+## 1. Architecture Integrity
+
+Verify:
+
+* modules are correctly separated
+* no duplicated implementations
+* no dead/unused critical paths
+* no circular dependency problems
+* interfaces/base classes/concrete implementations are consistent
+* imports are valid
+* existing architecture has not been accidentally bypassed
+
+Report:
+
+* architecture bugs
+* suspicious duplication
+* broken wiring
+* dead critical code
+
+---
+
+# 2. Database / Neon
+
+Verify the actual database architecture.
+
+Check:
+
+* DATABASE_URL handling
+* PostgreSQL/asyncpg compatibility
+* Neon SSL handling
+* channel_binding handling
+* connection pooling
+* AsyncSession
+* get_db
+* Alembic configuration
+* migration chain
+* current migration head
+* required tables/models
+* required columns
+* foreign keys/relationships
+* startup DB behavior
+* failure behavior when DB is unavailable
+
+Verify that the application is actually capable of using the Neon database configured through environment variables.
+
+Do NOT change DATABASE_URL.
+
+If live credentials are unavailable, clearly state:
+
+**LIVE NEON CONNECTION NOT VERIFIABLE**
+
+and distinguish that from code-level verification.
+
+---
+
+# 3. MT5 / Exness Integration
+
+Audit:
+
+* IMT5Connector
+* concrete MT5 connector
+* connection lifecycle
+* account information
+* symbol information
+* tick data
+* OHLCV data
+* positions
+* market orders
+* close position
+* modify position
+* broker errors
+* Linux/Replit limitations
+* Windows MT5 requirement
+* fail-safe behavior
+
+Verify that broker calls go through the connector abstraction and are not bypassed.
+
+Determine exactly what environment is required for actual demo execution.
+
+---
+
+# 4. Market Data
+
+Verify:
+
+* live data flow
+* symbol availability
+* timeframe support
+* OHLCV retrieval
+* tick retrieval
+* data freshness
+* missing-data handling
+* broker connection failure handling
+
+Check whether data flows correctly into downstream modules.
+
+---
+
+# 5. Market Scanner
+
+Verify against the implemented Section 4 requirements.
+
+Check:
+
+* required 10 pairs
+* required M1/M5/M15/M30/H1/H4 timeframes
+* trend
+* volatility
+* volume
+* spread
+* sessions
+* priority
+* continuous monitoring
+* async processing
+* candidate filtering
+* no trade execution
+* no risk calculation
+* downstream wiring
+
+Important:
+
+Do not invent requirements that were never part of Section 4.
+
+---
+
+# 6. Technical Indicators
+
+Verify:
+
+* indicator registry
+* indicator implementations
+* calculation correctness
+* scanner integration
+* error handling
+* insufficient candle handling
+* NaN/infinite values
+* timeframe compatibility
+
+Flag only concrete issues.
+
+---
+
+# 7. SMC Engine
+
+Verify:
+
+* analyzer implementation
+* BOS
+* CHoCH if implemented
+* liquidity
+* order blocks
+* FVG
+* structure detection
+* scanner/AI integration
+* malformed/incomplete market data handling
+
+Check whether the actual execution path uses SMC where the architecture requires it.
+
+---
+
+# 8. AI Engine
+
+Audit the actual implementation.
+
+Verify:
+
+* AI interfaces
+* rule-based engine
+* ML scaffold
+* feature extraction
+* signal generation
+* signal validation/filtering
+* confidence handling
+* scanner → AI flow
+* AI → Risk Manager flow
+* no accidental trade execution from AI
+* behavior when AI is unavailable
+* behavior when confidence is invalid
+
+Clearly distinguish:
+
+**implemented**
+
+from
+
+**scaffold/future**
+
+Do not call an intentionally empty ML scaffold a bug unless the current roadmap requires it.
+
+---
+
+# 9. Risk Manager
+
+Verify the actual Section 8 implementation.
+
+Check:
+
+* risk percentage
+* lot sizing
+* broker symbol specification
+* SL validation
+* TP validation
+* RR validation
+* maximum open trades
+* daily loss
+* daily profit
+* drawdown
+* consecutive losses
+* spread protection
+* session protection
+* news filter behavior
+* exposure limits
+* final approval
+* fail-closed behavior
+* immutable RiskApproval
+* order parameter matching
+
+Most importantly verify:
+
+**AI Decision → Risk Manager → RiskApproval → Trade Manager**
+
+and ensure there is no bypass.
+
+---
+
+# 10. Trade Manager
+
+Verify the actual Section 9 implementation.
+
+Check:
+
+* market BUY
+* market SELL
+* no pending orders
+* pre-execution validation
+* RiskApproval enforcement
+* MT5 connector usage
+* broker response handling
+* database trade record
+* open trade monitoring
+* SL
+* TP
+* manual close
+* broker-side close detection
+* failed order handling
+* duplicate trade protection
+* position synchronization
+* startup/shutdown monitor
+* API endpoints
+* trade history
+
+Most important security test:
+
+A trade MUST NOT reach the broker without valid RiskApproval.
+
+Verify this from the actual call path, not only from tests.
+
+---
+
+# 11. End-to-End Execution Chain
+
+Trace the actual runtime path.
+
+Determine whether this chain is genuinely connected:
+
+```text
+Market Data
+    ↓
+Market Scanner
+    ↓
+Technical Indicators / SMC
+    ↓
+AI Engine
+    ↓
+Risk Manager
+    ↓
+RiskApproval
+    ↓
+Trade Manager
+    ↓
+MT5 Connector
+    ↓
+Exness
+```
+
+For every arrow report:
+
+* CONNECTED
+* PARTIALLY CONNECTED
+* DISCONNECTED
+
+Do not infer connectivity from filenames or documentation.
+
+Follow actual imports, calls, callbacks, and runtime wiring.
+
+---
+
+# 12. Background Tasks
+
+Audit:
+
+* scanner/live feed
+* trade monitor
+* startup tasks
+* shutdown tasks
+* duplicate task prevention
+* cancellation
+* exception handling
+* event-loop safety
+* memory/resource leaks
+
+Check whether a task can silently die while the application continues running.
+
+---
+
+# 13. API
+
+Check all currently implemented endpoints.
+
+Verify:
+
+* authentication
+* authorization
+* request validation
+* response schemas
+* error handling
+* status codes
+* camelCase serialization if required
+* no accidental sensitive data exposure
+* no endpoint bypasses risk/execution security
+
+---
+
+# 14. Security
+
+Check:
+
+* authentication
+* authorization
+* secrets handling
+* `.env` protection
+* broker credentials
+* database credentials
+* API access
+* trade execution authorization
+* RiskApproval bypass possibilities
+* unsafe defaults
+* debug exposure
+* exception leakage
+
+Do not expose secret values in the report.
+
+---
+
+# 15. Configuration
+
+Check:
+
+* required environment variables
+* defaults
+* invalid values
+* production/demo safety
+* conflicting settings
+* settings that are defined but unused
+* settings used but not defined
+
+Clearly identify which settings are required before demo trading.
+
+---
+
+# 16. Tests
+
+Run the existing test suite.
+
+Do NOT modify tests.
+
+Report:
+
+* passed
+* failed
+* skipped
+* errors
+
+For every failure determine:
+
+* real current bug
+* environment limitation
+* MT5/Windows-only limitation
+* missing secret/configuration
+* pre-existing unrelated failure
+
+Do not label environment limitations as code bugs.
+
+---
+
+# 17. Startup / Runtime
+
+Perform a clean application startup check.
+
+Verify:
+
+* imports
+* migrations
+* DB initialization
+* API startup
+* background task startup
+* shutdown
+* no immediate exceptions
+* no port/process issue that is actually caused by the application
+
+If the application cannot fully start because an external dependency is unavailable, identify that dependency exactly.
+
+---
+
+# 18. DEMO TRADING READINESS
+
+This is the most important final assessment.
+
+Determine whether the bot is actually ready to connect to a **demo Exness account**.
+
+Separate findings into:
+
+### A. DEMO BLOCKERS
+
+Things that MUST be fixed before demo trading.
+
+### B. HIGH PRIORITY BUGS
+
+Things that could cause incorrect behavior or unsafe operation but may not completely block startup.
+
+### C. NORMAL BUGS
+
+Real issues that should be fixed but do not prevent safe demo operation.
+
+### D. TECHNICAL DEBT
+
+Non-critical cleanup/refactoring.
+
+### E. FUTURE FEATURES
+
+Explicitly deferred roadmap items.
+
+### F. ENVIRONMENT REQUIREMENTS
+
+Things that must be configured externally, such as:
+
+* Windows
+* MT5 terminal
+* Exness demo account
+* credentials
+* Neon DATABASE_URL
+* required environment variables
+
+---
+
+# 19. DEMO SAFETY
+
+Specifically verify that:
+
+* demo account is not accidentally treated as live
+* no hardcoded broker credentials exist
+* no automatic real-account execution can happen through default configuration
+* Risk Manager cannot be bypassed
+* Trade Manager cannot execute without approval
+* maximum risk limits are enforced
+* broker connection failures fail safely
+* database failures do not cause uncontrolled trading
+* duplicate execution is prevented
+* background worker failures are visible
+
+If you find any possibility of accidental live trading, classify it as:
+
+**CRITICAL DEMO BLOCKER**
+
+---
+
+# 20. FINAL REPORT FORMAT
+
+Do NOT give a generic "looks good" report.
+
+Return exactly this structure:
+
+## FINAL BOT AUDIT
+
+### Overall Status
+
+One of:
+
+* DEMO READY
+* DEMO READY AFTER MINOR FIXES
+* NOT DEMO READY
+
+### 1. Critical / Demo Blockers
+
+Table:
+
+| Issue | Evidence | Impact | Required Action |
+
+### 2. Bugs Found
+
+| Severity | Module | Bug | Evidence | Recommended Fix |
+
+### 3. Incomplete/Pending
+
+| Item | Current State | Required for Demo? |
+
+### 4. Intentionally Deferred
+
+| Feature | Status | Safe to Defer? |
+
+### 5. Section Status
+
+| Section | Status | Notes |
+| 1 | ... | ... |
+| 2 | ... | ... |
+| ... | ... | ... |
+| 9 | ... | ... |
+
+Use:
+
+* COMPLETE
+* PARTIAL
+* BLOCKED
+* FUTURE
+
+### 6. End-to-End Wiring
+
+Show:
+
+```text
+Market Data       → ?
+Scanner            → ?
+Indicators / SMC   → ?
+AI                 → ?
+Risk Manager       → ?
+RiskApproval       → ?
+Trade Manager      → ?
+MT5 Connector      → ?
+Exness             → ?
+Neon DB            → ?
+```
+
+For each arrow/state use CONNECTED / PARTIAL / DISCONNECTED.
+
+### 7. Test Results
+
+Give exact:
+
+* passed
+* failed
+* skipped
+* environment-only failures
+* actual bugs
+
+### 8. Environment Required for Demo
+
+List exactly what must exist before demo trading.
+
+### 9. Final Decision
+
+Answer exactly:
+
+**Can we safely move to demo trading now? YES / NO**
+
+If NO, list ONLY the blockers that must be resolved first.
+
+---
+
+# FINAL RESTRICTIONS
+
+* READ ONLY
+* NO CODE CHANGES
+* NO FILE CREATION
+* NO MIGRATIONS
+* NO CONFIG CHANGES
+* NO SECRET CHANGES
+* NO GIT COMMIT
+* NO GIT PUSH
+* NO AUTOMATIC FIXES
+* Do not redo work that is already correct.
+* Do not invent missing requirements.
+* Do not classify future features as bugs.
+* Do not rely only on previous completion reports.
+* Verify the actual runtime architecture.
+* Prioritize demo safety and execution-chain correctness.
+
+The purpose of this audit is to give us a **truthful go/no-go decision before connecting the bot to an Exness demo account**.
