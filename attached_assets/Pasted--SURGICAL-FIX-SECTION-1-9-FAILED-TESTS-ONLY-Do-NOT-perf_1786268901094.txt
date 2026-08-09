@@ -1,0 +1,93 @@
+## SURGICAL FIX — SECTION 1–9 FAILED TESTS ONLY
+
+Do NOT perform another full codebase audit.
+Do NOT rewrite or refactor unrelated modules.
+Do NOT change existing architecture or completed Section 1–9 functionality.
+
+### Objective
+
+Fix and verify ONLY the 7 currently failing tests from `test_section11_api.py`:
+
+1. `test_me_authenticated`
+2. `test_me_unauthenticated`
+3. `test_summary_unauthenticated`
+4. `test_performance_unauthenticated`
+5. `test_settings_unauthenticated`
+6. `test_logs_unauthenticated`
+7. `test_signals_unauthenticated`
+
+### Step 1 — Inspect only relevant files
+
+Read:
+
+* `backend/tests/test_section11_api.py`
+* `backend/tests/conftest.py`
+* `backend/app/core/auth.py`
+* `backend/app/api/v1/auth.py` or the actual `/me` implementation
+* relevant Section 11 API routes
+* `backend/app/core/database.py`
+* `backend/app/core/config.py`
+
+Determine the exact root cause of each failure before changing anything.
+
+### Step 2 — Fix `test_me_authenticated`
+
+Investigate the reported asyncpg event-loop mismatch.
+
+Requirements:
+
+* Do NOT weaken authentication.
+* Do NOT disable database access.
+* Do NOT add test-only production behavior.
+* Preserve the existing async SQLAlchemy architecture.
+* Ensure the authenticated `/me` test uses the same compatible event loop/session lifecycle as the application test setup.
+* If the issue is caused by a session-scoped DB engine/pool being reused across function-scoped event loops, fix the test infrastructure/configuration at the smallest possible scope.
+
+### Step 3 — Fix the 6 unauthenticated tests
+
+These tests must verify that protected endpoints reject unauthenticated requests.
+
+Do NOT simply change the tests to expect `200`.
+Do NOT remove authentication.
+Do NOT weaken `get_current_user_id`.
+
+Instead:
+
+* Verify that `APP_ENV=development` is causing the bypass.
+* Make the test environment explicitly use a non-development environment such as `test`/`staging`, if the existing architecture supports it.
+* Preserve the intentional development bypass for local development.
+* Ensure production/staging behavior still requires real authentication.
+* Update only the test configuration/environment if that is the correct architectural fix.
+
+### Step 4 — Run only the affected tests first
+
+Run exactly:
+
+`pytest backend/tests/test_section11_api.py -q`
+
+If failures remain, inspect and fix only those failures.
+
+### Step 5 — Regression verification
+
+After the targeted tests pass, run the complete existing test suite once:
+
+`pytest -q`
+
+Report:
+
+* total passed
+* total failed
+* skipped
+* whether any NEW failures appeared
+* whether any existing Section 1–9 functionality was modified
+
+### Strict constraints
+
+* No broad refactoring.
+* No unrelated feature implementation.
+* No changes to Risk Manager, Trade Manager, AI Engine, Scanner, MT5 integration, or Neon architecture unless the failing test proves they are directly responsible.
+* Do not alter authentication semantics to make tests pass.
+* Do not claim success unless the targeted tests actually pass.
+* Show the exact files changed and the reason for each change.
+
+Final response must clearly state whether the 7 failures are FIXED, PRE-EXISTING, or ENVIRONMENT-DEPENDENT.

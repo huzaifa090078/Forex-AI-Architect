@@ -3,5 +3,5 @@
 - [Settings service transient obj](settings-transient.md) — use _FakeSettings plain class instead of BotSettings.__new__ to avoid missing _sa_instance_state when bot user doesn't exist.
 - [PyJWT requirements](pyjwt-requirements.md) — PyJWT==2.8.0 must be in requirements.txt; passlib[bcrypt] already there; both needed for auth service.
 - [WebSocket CORS](ws-cors.md) — In dev (APP_ENV=development), CORSMiddleware must use allow_origins=["*"] with allow_credentials=False; wildcard+credentials disallowed by spec.
-- [Dev bypass auth tests](dev-bypass-auth-tests.md) — 7 section11 tests (test_me_authenticated, 6 unauthenticated-rejection tests) always fail in APP_ENV=development; expected, not regressions.
 - [E2E pipeline design](e2e-pipeline-design.md) — Auto-trading pipeline in trading_pipeline/pipeline.py; uses take_profit_2 (1:2 R:R) for risk approval to meet RISK_MIN_RR=2.0 default.
+- [Test env setup](test-env-setup.md) — conftest.py sets APP_ENV=test + NullPool to fix asyncpg cross-loop + dev bypass; 162 pass / 0 fail.
