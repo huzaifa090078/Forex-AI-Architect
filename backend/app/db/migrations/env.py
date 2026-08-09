@@ -29,7 +29,7 @@ if "?" in database_url:
     from urllib.parse import urlparse, urlencode, parse_qs, urlunparse
     _parsed = urlparse(database_url)
     _params = parse_qs(_parsed.query, keep_blank_values=True)
-    for _k in ("sslmode", "sslcert", "sslkey", "sslrootcert"):
+    for _k in ("sslmode", "sslcert", "sslkey", "sslrootcert", "channel_binding"):
         _params.pop(_k, None)
     database_url = urlunparse(_parsed._replace(
         query=urlencode({k: v[0] for k, v in _params.items()})

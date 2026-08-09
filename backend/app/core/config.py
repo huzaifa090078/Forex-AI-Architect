@@ -44,7 +44,7 @@ class Settings(BaseSettings):
             parsed = urlparse(v)
             params = parse_qs(parsed.query, keep_blank_values=True)
             # asyncpg handles SSL natively; drop driver-incompatible params
-            for key in ("sslmode", "sslcert", "sslkey", "sslrootcert"):
+            for key in ("sslmode", "sslcert", "sslkey", "sslrootcert", "channel_binding"):
                 params.pop(key, None)
             new_query = urlencode({k: v[0] for k, v in params.items()})
             v = urlunparse(parsed._replace(query=new_query))
