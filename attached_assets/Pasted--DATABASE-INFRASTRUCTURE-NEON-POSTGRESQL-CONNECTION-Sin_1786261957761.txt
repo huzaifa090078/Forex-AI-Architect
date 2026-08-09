@@ -1,0 +1,137 @@
+## DATABASE INFRASTRUCTURE — NEON POSTGRESQL CONNECTION
+
+### Single Surgical Implementation Prompt
+
+Implement the project's database connection to **Neon PostgreSQL** using the existing database architecture.
+
+### Critical rules
+
+* Do NOT redesign or replace the existing database architecture.
+* Do NOT create a second database layer.
+* Do NOT replace SQLAlchemy with another ORM/database library.
+* Do NOT modify business logic from Sections 1–9.
+* Do NOT modify SMC, Indicators, AI Engine, Market Scanner, Risk Manager, or Trade Manager logic except where strictly required to make the existing DB connection work.
+* Reuse the project's existing SQLAlchemy `AsyncSession`, models, `get_db`, Alembic/migration setup, and configuration patterns.
+* Do NOT hardcode credentials.
+* Do NOT print, expose, commit, or log the Neon connection string/password.
+* Do NOT modify `.env` with real secrets unless they are already supplied through the environment.
+* Keep local development compatibility if the existing project supports it.
+
+### Objective
+
+Connect the existing application database layer to a Neon PostgreSQL database through an environment variable such as:
+
+`DATABASE_URL`
+
+Use the project's existing configuration convention if a database URL setting already exists. Do not create a duplicate setting unnecessarily.
+
+### Implementation requirements
+
+1. Inspect the existing database configuration first:
+
+   * `config.py`
+   * database/session module
+   * SQLAlchemy engine creation
+   * `get_db`
+   * ORM models
+   * Alembic configuration
+   * startup/shutdown database handling
+   * `.env.example`
+   * existing database tests
+
+2. Determine whether the current application already expects PostgreSQL.
+
+3. If the project already uses PostgreSQL-compatible SQLAlchemy configuration:
+
+   * adapt the existing connection URL handling for Neon;
+   * preserve the existing async architecture;
+   * use the appropriate async PostgreSQL driver already supported by the project;
+   * do not introduce unnecessary dependencies.
+
+4. Neon connection requirements:
+
+   * support `DATABASE_URL` from environment variables;
+   * correctly handle a Neon PostgreSQL URL;
+   * preserve SSL requirements required by Neon;
+   * ensure SQLAlchemy receives a valid async connection URL where required;
+   * do not hardcode `sslmode`, credentials, host, or database name.
+
+5. Connection pooling:
+
+   * use the existing SQLAlchemy pool configuration if already present;
+   * configure sensible production-safe pool settings only if the existing configuration requires it;
+   * do not introduce aggressive connection counts that could unnecessarily exhaust Neon limits.
+
+6. Alembic:
+
+   * make sure Alembic can connect to the same Neon database;
+   * preserve the existing migration history;
+   * do NOT recreate or delete migrations;
+   * do NOT reset/drop the database;
+   * do NOT use destructive migration commands.
+
+7. Environment documentation:
+
+   * update `.env.example` only if needed;
+   * document the required `DATABASE_URL` format without including real credentials;
+   * if Neon-specific SSL configuration is required, document it safely.
+
+8. Existing database schema:
+
+   * do not manually recreate tables if Alembic already manages them;
+   * verify that the existing migrations can be applied to a fresh PostgreSQL database;
+   * preserve all existing models and relationships.
+
+9. Application startup:
+
+   * ensure the application does not crash merely because the database has not yet been contacted;
+   * when a database connection is required, failures must produce a clear structured error rather than silently using fake/in-memory production data;
+   * do not add mock/fake database fallback.
+
+10. Verification:
+    Run the smallest useful verification set:
+
+* Python compile/import checks for changed files;
+* existing database tests;
+* SQLAlchemy engine/session initialization test;
+* Alembic configuration validation;
+* migration validation against PostgreSQL if a Neon `DATABASE_URL` is available in the environment;
+* application startup check.
+
+11. If a real Neon `DATABASE_URL` is NOT available in the environment:
+
+* do NOT invent one;
+* do NOT claim Neon connectivity was verified;
+* verify configuration and PostgreSQL compatibility locally;
+* clearly report that live Neon connectivity remains unverified.
+
+12. Security:
+
+* never include the actual `DATABASE_URL` in the final report;
+* never print database passwords/tokens;
+* never commit secrets;
+* verify `.gitignore` covers local environment files if appropriate.
+
+### Scope boundary
+
+This task is ONLY about connecting the existing database infrastructure to Neon PostgreSQL.
+
+Do NOT implement new application features.
+
+Do NOT modify Section 10+ functionality.
+
+Do NOT refactor unrelated code.
+
+### Final report
+
+Report only:
+
+1. Files changed
+2. Existing DB architecture reused
+3. Neon/PostgreSQL configuration changes
+4. Alembic status
+5. Tests/checks performed
+6. Whether LIVE Neon connectivity was actually verified
+7. Any remaining blocker
+
+Do not claim the database is connected unless an actual connection to Neon was successfully verified.
