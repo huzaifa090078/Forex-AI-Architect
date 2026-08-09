@@ -36,6 +36,11 @@ if "?" in database_url:
     ))
 config.set_main_option("sqlalchemy.url", database_url)
 
+# asyncpg requires SSL to be passed as connect_args, not as a URL parameter.
+# Auto-enable for Neon (host contains neon.tech) or when DATABASE_SSL=true.
+_db_ssl_env = os.environ.get("DATABASE_SSL", "false").lower() in ("1", "true", "yes")
+_migration_connect_args: dict = {"ssl": True} if (_db_ssl_env or "neon.tech" in database_url) else {}
+
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
@@ -66,6 +71,7 @@ async def run_async_migrations() -> None:
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=_migration_connect_args,
     )
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)

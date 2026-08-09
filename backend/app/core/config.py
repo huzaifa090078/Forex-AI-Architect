@@ -49,8 +49,16 @@ class Settings(BaseSettings):
             new_query = urlencode({k: v[0] for k, v in params.items()})
             v = urlunparse(parsed._replace(query=new_query))
         return v
-    DATABASE_POOL_SIZE: int = Field(default=10)
-    DATABASE_MAX_OVERFLOW: int = Field(default=20)
+    DATABASE_POOL_SIZE: int = Field(default=5)
+    DATABASE_MAX_OVERFLOW: int = Field(default=10)
+    # Set to true to force SSL on the database connection.
+    # Auto-detected for Neon (host contains neon.tech); not needed for local PostgreSQL.
+    DATABASE_SSL: bool = Field(default=False)
+
+    @property
+    def database_use_ssl(self) -> bool:
+        """True when SSL is required — auto-detected for Neon, or forced via DATABASE_SSL=true."""
+        return self.DATABASE_SSL or "neon.tech" in self.DATABASE_URL
 
     # ── JWT / Auth ────────────────────────────────────────────────────────────
     JWT_SECRET_KEY: str = Field(...)

@@ -18,12 +18,18 @@ from app.core.config import settings
 # Engine
 # ---------------------------------------------------------------------------
 
+# asyncpg does not accept sslmode as a URL parameter — SSL is passed via
+# connect_args instead.  Auto-enabled for Neon (host contains neon.tech) or
+# when DATABASE_SSL=true is set in the environment.
+_connect_args: dict = {"ssl": True} if settings.database_use_ssl else {}
+
 engine = create_async_engine(
     settings.DATABASE_URL,
     pool_size=settings.DATABASE_POOL_SIZE,
     max_overflow=settings.DATABASE_MAX_OVERFLOW,
     pool_pre_ping=True,
     echo=settings.APP_DEBUG,
+    connect_args=_connect_args,
 )
 
 # ---------------------------------------------------------------------------
