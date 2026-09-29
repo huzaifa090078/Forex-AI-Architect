@@ -88,17 +88,45 @@ async def get_summary(db: AsyncSession) -> DashboardSummaryOut:
     open_count = await _get_open_count(db)
     total, total_pnl, today_pnl, win_rate = await _get_trade_stats(db)
 
-    # Balance/equity: use a safe default — no fake data, just 0.0
-    # These will be populated by the frontend using /v1/market/health when MT5 is connected.
+    # Balance/equity/margin: fetch from MT5 if connector is live
+    balance = 0.0
+    equity = 0.0
+    margin = None
+    free_margin = None
+    leverage = None
+    mt5_connected = False
+    broker_server = None
+
+    try:
+        from app.modules.trade_manager.manager import trade_manager
+        connector = getattr(trade_manager, "_connector", None)
+        if connector is not None:
+            info = await connector.get_account_info()
+            if info:
+                balance = float(info.balance)
+                equity = float(info.equity)
+                margin = float(info.margin)
+                free_margin = float(info.free_margin)
+                leverage = int(info.leverage)
+                mt5_connected = bool(info.connected)
+                broker_server = str(info.server)
+    except Exception:
+        pass
+
     return DashboardSummaryOut(
-        balance      = 0.0,
-        equity       = 0.0,
-        total_pnl    = round(total_pnl, 2),
-        today_pnl    = round(today_pnl, 2),
-        open_trades  = open_count,
-        total_trades = total,
-        win_rate     = round(win_rate, 4),
-        bot_status   = _bot_status(),
+        balance        = round(balance, 2),
+        equity         = round(equity, 2),
+        total_pnl      = round(total_pnl, 2),
+        today_pnl      = round(today_pnl, 2),
+        open_trades    = open_count,
+        total_trades   = total,
+        win_rate       = round(win_rate, 4),
+        bot_status     = _bot_status(),
+        mt5_connected  = mt5_connected,
+        broker_server  = broker_server,
+        margin         = round(margin, 2) if margin is not None else None,
+        free_margin    = round(free_margin, 2) if free_margin is not None else None,
+        leverage       = leverage,
     )
 
 

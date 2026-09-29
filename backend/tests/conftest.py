@@ -29,6 +29,9 @@ conftest module load time, it executes before any pytest fixture setup.
 """
 import os
 os.environ["APP_ENV"] = "test"          # Must be first — before any app import
+os.environ.setdefault("APP_SECRET_KEY", "test-secret-key-12345678901234567890123456789012")
+os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://user:password@localhost:5432/forex_bot")
+os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret-key-12345678901234567890123456789012")
 
 import asyncio
 import pytest

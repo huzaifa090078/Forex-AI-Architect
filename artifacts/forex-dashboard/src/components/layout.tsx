@@ -97,7 +97,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {/* MT5 Status */}
           <div className="flex items-center justify-between mt-1.5">
             <span className="text-[9px] uppercase text-sidebar-foreground/50 font-bold tracking-widest">MT5</span>
-            <span className="text-[10px] font-mono text-red-400 font-bold uppercase tracking-wider">UNAVAILABLE</span>
+            <div className="flex items-center gap-1.5">
+              <div className={cn(
+                "w-1.5 h-1.5 rounded-full",
+                (summary as any)?.mt5Connected || (summary as any)?.mt5_connected
+                  ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"
+                  : "bg-amber-500"
+              )} />
+              <span className={cn(
+                "text-[10px] font-mono font-bold uppercase tracking-wider",
+                (summary as any)?.mt5Connected || (summary as any)?.mt5_connected ? "text-emerald-400" : "text-amber-400"
+              )}>
+                {(summary as any)?.mt5Connected || (summary as any)?.mt5_connected ? "CONNECTED" : "OFFLINE"}
+              </span>
+            </div>
           </div>
           {/* WS Status */}
           <div className="flex items-center justify-between mt-1.5">

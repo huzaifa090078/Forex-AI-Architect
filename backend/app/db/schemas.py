@@ -52,6 +52,11 @@ class DashboardSummaryOut(BaseModel):
     total_trades: int
     win_rate: float
     bot_status: str                    # "running" | "paused" | "stopped" | "error"
+    mt5_connected: bool = False
+    broker_server: Optional[str] = None
+    margin: Optional[float] = None
+    free_margin: Optional[float] = None
+    leverage: Optional[int] = None
 
 
 class PerformancePointOut(BaseModel):
@@ -266,6 +271,7 @@ class BacktestOut(BaseModel):
     sharpe_ratio: Optional[float] = None
     created_at: datetime
     completed_at: Optional[datetime] = None
+    result_detail: Optional[Dict[str, Any]] = None
 
 
 # ─── News (Section 10) ────────────────────────────────────────────────────────

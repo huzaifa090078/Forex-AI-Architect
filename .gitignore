@@ -48,3 +48,16 @@ Thumbs.db
 .cache/
 .local/
 .env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+env/
+venv/
+ENV/
