@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 
 from app.modules.mt5_integration.interfaces import (
     AccountInfo,
+    BrokerDeal,
     BrokerOrder,
     BrokerPosition,
     IMT5Connector,
@@ -83,6 +84,31 @@ _ORDER_TYPE: Dict[int, str] = {
     5: "sell_stop",
     6: "buy_stop_limit",
     7: "sell_stop_limit",
+}
+
+# MT5 deal-type integer → canonical string
+_DEAL_TYPE: Dict[int, str] = {
+    0: "buy",
+    1: "sell",
+    2: "balance",
+    3: "credit",
+    4: "charge",
+    5: "correction",
+    6: "bonus",
+    7: "commission",
+    8: "commission_daily",
+    9: "commission_monthly",
+    10: "agent_daily",
+    11: "agent_monthly",
+    12: "interest",
+}
+
+# MT5 deal-entry integer → canonical string
+_DEAL_ENTRY: Dict[int, str] = {
+    0: "in",
+    1: "out",
+    2: "inout",
+    3: "out_by",
 }
 
 
@@ -238,6 +264,11 @@ class RealMT5Connector(IMT5Connector):
             leverage=raw.leverage,
             currency=raw.currency,
             connected=True,
+            margin_level=float(getattr(raw, "margin_level", 0.0) or 0.0),
+            profit=float(getattr(raw, "profit", 0.0) or 0.0),
+            trade_allowed=bool(getattr(raw, "trade_allowed", False)),
+            trade_expert=bool(getattr(raw, "trade_expert", False)),
+            company=str(getattr(raw, "company", "") or ""),
         )
 
     async def get_positions(self) -> List[BrokerPosition]:
@@ -263,7 +294,45 @@ class RealMT5Connector(IMT5Connector):
                     tp=p.tp,
                     profit=p.profit,
                     open_time=datetime.fromtimestamp(p.time, tz=timezone.utc),
-                    comment=p.comment,
+                    comment=p.comment or "",
+                    magic=int(getattr(p, "magic", 0) or 0),
+                    swap=float(getattr(p, "swap", 0.0) or 0.0),
+                )
+            )
+        return result
+
+    async def get_history_deals(self, days: int = 30) -> List[BrokerDeal]:
+        """Return executed trade deals from MT5 history within the last `days` days."""
+        _require_mt5()
+        from datetime import timedelta
+
+        utc_now = datetime.now(timezone.utc)
+        utc_from = utc_now - timedelta(days=days)
+
+        raw_deals = await self._run(mt5.history_deals_get, utc_from, utc_now + timedelta(days=1))
+        if raw_deals is None:
+            error = await self._run(mt5.last_error)
+            logger.warning("mt5.history_deals_get() returned None: %s", error)
+            return []
+
+        result: List[BrokerDeal] = []
+        for d in raw_deals:
+            result.append(
+                BrokerDeal(
+                    ticket=d.ticket,
+                    order=d.order,
+                    symbol=d.symbol or "",
+                    type=_DEAL_TYPE.get(d.type, str(d.type)),
+                    entry=_DEAL_ENTRY.get(d.entry, str(d.entry)),
+                    volume=float(d.volume),
+                    price=float(d.price),
+                    profit=float(d.profit),
+                    commission=float(getattr(d, "commission", 0.0) or 0.0),
+                    swap=float(getattr(d, "swap", 0.0) or 0.0),
+                    fee=float(getattr(d, "fee", 0.0) or 0.0),
+                    time=datetime.fromtimestamp(d.time, tz=timezone.utc),
+                    magic=int(getattr(d, "magic", 0) or 0),
+                    comment=str(getattr(d, "comment", "") or ""),
                 )
             )
         return result

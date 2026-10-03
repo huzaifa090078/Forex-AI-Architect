@@ -5,6 +5,7 @@
 
 from app.modules.mt5_integration.interfaces import (
     AccountInfo,
+    BrokerDeal,
     BrokerOrder,
     BrokerPosition,
     IMT5Connector,
@@ -16,5 +17,6 @@ __all__ = [
     "RealMT5Connector",
     "AccountInfo",
     "BrokerPosition",
+    "BrokerDeal",
     "BrokerOrder",
 ]

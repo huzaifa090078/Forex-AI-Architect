@@ -18,6 +18,7 @@ from app.api.v1.smc import router as smc_router
 from app.api.v1.ai import router as ai_router
 from app.api.v1.risk import router as risk_router
 from app.api.v1.candles import router as candles_router
+from app.api.v1.mt5 import router as mt5_router
 from app.api.v1.ws import router as ws_router
 
 api_router = APIRouter()
@@ -43,6 +44,7 @@ api_router.include_router(smc_router,        prefix="/v1/smc",        tags=["smc
 api_router.include_router(ai_router,         prefix="/v1/ai",         tags=["ai"])
 api_router.include_router(risk_router,       prefix="/v1/risk",       tags=["risk"])
 api_router.include_router(candles_router,    prefix="/v1/candles",    tags=["candles"])
+api_router.include_router(mt5_router,        prefix="/v1/mt5",        tags=["mt5"])
 
 # ── WebSocket (root — no /api prefix to avoid proxy rewriting) ───────────────
 api_router.include_router(ws_router, tags=["ws"])

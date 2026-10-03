@@ -27,6 +27,11 @@ class AccountInfo:
     leverage: int
     currency: str
     connected: bool = False
+    margin_level: float = 0.0
+    profit: float = 0.0                # Floating P/L across open positions
+    trade_allowed: bool = False
+    trade_expert: bool = False
+    company: str = ""
 
 
 @dataclass
@@ -40,8 +45,29 @@ class BrokerPosition:
     current_price: float
     sl: float
     tp: float
-    profit: float
+    profit: float                      # Floating P/L on this open position
     open_time: datetime
+    comment: str = ""
+    magic: int = 0
+    swap: float = 0.0
+
+
+@dataclass
+class BrokerDeal:
+    """A closed trade deal executed on the broker (from history)."""
+    ticket: int
+    order: int
+    symbol: str
+    type: str                          # "buy" | "sell" | "balance" | etc.
+    entry: str                         # "in" | "out" | "inout" | "out_by"
+    volume: float
+    price: float
+    profit: float                      # Closed / realized profit
+    commission: float
+    swap: float
+    fee: float
+    time: datetime
+    magic: int = 0
     comment: str = ""
 
 
@@ -80,6 +106,10 @@ class IMT5Connector(ABC):
     async def get_positions(self) -> List[BrokerPosition]:
         """Return all currently open positions."""
         ...
+
+    async def get_history_deals(self, days: int = 30) -> List[BrokerDeal]:
+        """Fetch historical executed deals within the specified number of days."""
+        return []
 
     @abstractmethod
     async def get_orders(self) -> List[BrokerOrder]:
