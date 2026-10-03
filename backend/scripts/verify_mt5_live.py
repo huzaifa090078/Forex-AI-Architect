@@ -32,6 +32,14 @@ import json
 import datetime
 
 # ── Env-var credentials ───────────────────────────────────────────────────
+try:
+    from dotenv import load_dotenv
+    _env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+    if os.path.exists(_env_path):
+        load_dotenv(_env_path)
+except ImportError:
+    pass
+
 ACCT_STR = os.environ.get("MT5_ACCOUNT", "")
 SERVER    = os.environ.get("MT5_SERVER",  "")
 PASSWORD  = os.environ.get("MT5_PASSWORD","")
@@ -253,8 +261,8 @@ async def run_scanner_check():
 
     # Full scan_pair call through the scanner (enriches with SMC context)
     try:
-        result = await scanner.scan_pair("EURUSD", "M5")
-        chk("scanner.scan_pair(EURUSD, M5) returns ScanResult",
+        result = await scanner.scan_pair("EURUSD")
+        chk("scanner.scan_pair(EURUSD) returns ScanResult",
             PASS if result is not None else FAIL)
         if result:
             chk("  ScanResult.pair = EURUSD",
@@ -281,7 +289,7 @@ async def run_smc_check():
     tf_bars = {}
     for tf_name, tf_int in TF_MAP.items():
         try:
-            bars = await svc.get_ohlcv("EURUSD", tf_int, 50)
+            bars = await svc.get_ohlcv("EURUSD", tf_name, 50)
             if bars:
                 tf_bars[tf_name] = bars
         except Exception:
@@ -384,7 +392,7 @@ if failed:
     print("  FAILURES:")
     for n, s in results:
         if s == FAIL:
-            print(f"    ✗ {n}")
+            print(f"    [FAIL] {n}")
 else:
     print()
     print("  All checks passed — live MT5/Exness integration verified.")

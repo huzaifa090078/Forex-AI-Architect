@@ -104,6 +104,7 @@ class RealMT5Connector(IMT5Connector):
         from app.core.config import settings as _settings
 
         self._settings = _settings
+        self._symbol_cache: Dict[str, str] = {}
 
     # ------------------------------------------------------------------
     # Private helpers
@@ -113,6 +114,41 @@ class RealMT5Connector(IMT5Connector):
         """Offload a blocking MT5 call to the default thread-pool executor."""
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, lambda: fn(*args, **kwargs))
+
+    async def _resolve_symbol(self, symbol: str) -> str:
+        """
+        Resolves broker-specific symbol names (e.g., 'EURUSD' -> 'EURUSDm' on Exness).
+        Selects the symbol in Market Watch if found and caches the result.
+        """
+        if symbol in self._symbol_cache:
+            return self._symbol_cache[symbol]
+
+        info = await self._run(mt5.symbol_info, symbol)
+        if info is not None:
+            await self._run(mt5.symbol_select, symbol, True)
+            self._symbol_cache[symbol] = symbol
+            return symbol
+
+        for suffix in ("m", "c", ".r", "_i", ".a", ".s"):
+            candidate = f"{symbol}{suffix}"
+            c_info = await self._run(mt5.symbol_info, candidate)
+            if c_info is not None:
+                await self._run(mt5.symbol_select, candidate, True)
+                self._symbol_cache[symbol] = candidate
+                logger.info("Resolved broker symbol: %s -> %s", symbol, candidate)
+                return candidate
+
+        all_symbols = await self._run(mt5.symbols_get)
+        if all_symbols:
+            for s in all_symbols:
+                if s.name == symbol or s.name.startswith(symbol):
+                    await self._run(mt5.symbol_select, s.name, True)
+                    self._symbol_cache[symbol] = s.name
+                    logger.info("Resolved broker symbol: %s -> %s", symbol, s.name)
+                    return s.name
+
+        self._symbol_cache[symbol] = symbol
+        return symbol
 
     # ------------------------------------------------------------------
     # IMT5Connector — lifecycle
@@ -130,6 +166,15 @@ class RealMT5Connector(IMT5Connector):
         init_kwargs: Dict[str, Any] = {}
         if terminal_path:
             init_kwargs["path"] = terminal_path
+        if cfg.MT5_ACCOUNT:
+            try:
+                init_kwargs["login"] = int(cfg.MT5_ACCOUNT)
+            except (ValueError, TypeError):
+                pass
+        if cfg.MT5_PASSWORD:
+            init_kwargs["password"] = cfg.MT5_PASSWORD
+        if cfg.MT5_SERVER:
+            init_kwargs["server"] = cfg.MT5_SERVER
 
         initialized: bool = await self._run(mt5.initialize, **init_kwargs)
         if not initialized:
@@ -137,22 +182,25 @@ class RealMT5Connector(IMT5Connector):
             logger.error("mt5.initialize() failed: %s", error)
             return False
 
-        logged_in: bool = await self._run(
-            mt5.login,
-            cfg.MT5_ACCOUNT,
-            password=cfg.MT5_PASSWORD,
-            server=cfg.MT5_SERVER,
-        )
-        if not logged_in:
-            error = await self._run(mt5.last_error)
-            logger.error(
-                "mt5.login() failed — account: %s, server: %s, error: %s",
-                _mask_account(cfg.MT5_ACCOUNT),
-                cfg.MT5_SERVER,
-                error,
+        account_info = await self._run(mt5.account_info)
+        acct_num = int(cfg.MT5_ACCOUNT) if cfg.MT5_ACCOUNT else 0
+        if account_info is None or (acct_num and account_info.login != acct_num):
+            logged_in: bool = await self._run(
+                mt5.login,
+                acct_num,
+                password=cfg.MT5_PASSWORD,
+                server=cfg.MT5_SERVER,
             )
-            await self._run(mt5.shutdown)
-            return False
+            if not logged_in:
+                error = await self._run(mt5.last_error)
+                logger.error(
+                    "mt5.login() failed — account: %s, server: %s, error: %s",
+                    _mask_account(cfg.MT5_ACCOUNT),
+                    cfg.MT5_SERVER,
+                    error,
+                )
+                await self._run(mt5.shutdown)
+                return False
 
         logger.info(
             "MT5 connected — account: %s, server: %s",
@@ -270,6 +318,7 @@ class RealMT5Connector(IMT5Connector):
         Returns the full broker response as a plain dict.
         """
         _require_mt5()
+        symbol = await self._resolve_symbol(symbol)
 
         direction_lower = direction.lower()
         if direction_lower == "buy":
@@ -448,6 +497,7 @@ class RealMT5Connector(IMT5Connector):
             "real_volume" — int    (raw MT5 value, kept for completeness)
         """
         _require_mt5()
+        symbol = await self._resolve_symbol(symbol)
 
         # Fetch symbol point size once to convert spread from MT5 integer points
         # to price units (e.g. 10 points × 0.00001 = 0.0001 for EURUSD).
@@ -513,6 +563,7 @@ class RealMT5Connector(IMT5Connector):
         No OHLCV bars are used; this is a direct terminal query.
         """
         _require_mt5()
+        symbol = await self._resolve_symbol(symbol)
 
         tick = await self._run(mt5.symbol_info_tick, symbol)
         if tick is None:
@@ -522,13 +573,29 @@ class RealMT5Connector(IMT5Connector):
                 "The symbol may be unavailable or the terminal is disconnected."
             )
 
+        bid = float(tick.bid)
+        ask = float(tick.ask)
+        tick_time = tick.time
+
+        # Weekend / market-closed fallback when terminal has no active tick in memory
+        if (bid == 0.0 or ask == 0.0) or tick_time == 0:
+            rates = await self._run(mt5.copy_rates_from_pos, symbol, mt5.TIMEFRAME_M1, 0, 1)
+            if rates is not None and len(rates) > 0:
+                last_price = float(rates[-1]["close"])
+                info = await self._run(mt5.symbol_info, symbol)
+                spread_pts = float(info.spread) if (info and info.spread) else 10.0
+                pt = float(info.point) if (info and info.point) else 0.00001
+                bid = last_price
+                ask = last_price + (spread_pts * pt)
+                tick_time = int(rates[-1]["time"])
+
         return {
-            "bid":       float(tick.bid),
-            "ask":       float(tick.ask),
-            "spread":    float(tick.ask - tick.bid),
+            "bid":       bid,
+            "ask":       ask,
+            "spread":    float(ask - bid),
             "last":      float(tick.last),
             "volume":    int(tick.volume),
-            "tick_time": datetime.fromtimestamp(tick.time, tz=timezone.utc),
+            "tick_time": datetime.fromtimestamp(tick_time, tz=timezone.utc),
         }
 
     # ------------------------------------------------------------------
@@ -543,6 +610,7 @@ class RealMT5Connector(IMT5Connector):
         Raises RuntimeError if the symbol is unavailable or MT5 is not connected.
         """
         _require_mt5()
+        symbol = await self._resolve_symbol(symbol)
 
         info = await self._run(mt5.symbol_info, symbol)
         if info is None:
@@ -581,22 +649,26 @@ class RealMT5Connector(IMT5Connector):
         """
         _require_mt5()
 
+        resolved_symbols = await asyncio.gather(
+            *[self._resolve_symbol(sym) for sym in symbols]
+        )
+
         # Fetch symbol_info for all symbols concurrently via the thread-pool
         # executor so the async event loop is never blocked.
         results: List[Any] = await asyncio.gather(
-            *[self._run(mt5.symbol_info, sym) for sym in symbols],
+            *[self._run(mt5.symbol_info, sym) for sym in resolved_symbols],
             return_exceptions=True,
         )
 
         availability: Dict[str, bool] = {}
-        for sym, result in zip(symbols, results):
+        for orig_sym, result in zip(symbols, results):
             if isinstance(result, Exception):
                 logger.warning(
-                    "check_symbols: mt5.symbol_info('%s') raised %s", sym, result
+                    "check_symbols: mt5.symbol_info('%s') raised %s", orig_sym, result
                 )
-                availability[sym] = False
+                availability[orig_sym] = False
             else:
                 # mt5.symbol_info returns None when the symbol is unknown.
-                availability[sym] = result is not None
+                availability[orig_sym] = result is not None
 
         return availability

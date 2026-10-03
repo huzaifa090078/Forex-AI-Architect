@@ -240,15 +240,22 @@ class MarketDataService(IMarketDataProvider):
             ValueError   — unsupported timeframe string.
             RuntimeError — MT5 returned no data after reconnect attempt.
         """
-        if timeframe not in _MT5_TIMEFRAMES:
-            raise ValueError(
-                f"Unsupported timeframe '{timeframe}'. "
-                f"Supported: {list(_MT5_TIMEFRAMES.keys())}"
-            )
+        if isinstance(timeframe, int):
+            rev = {v: k for k, v in _MT5_TIMEFRAMES.items()}
+            rev[16390] = "M5"
+            rev[16392] = "M15"
+            timeframe_str = rev.get(timeframe, "M5")
+            mt5_tf = timeframe
+        else:
+            if timeframe not in _MT5_TIMEFRAMES:
+                raise ValueError(
+                    f"Unsupported timeframe '{timeframe}'. "
+                    f"Supported: {list(_MT5_TIMEFRAMES.keys())}"
+                )
+            timeframe_str = timeframe
+            mt5_tf = _MT5_TIMEFRAMES[timeframe]
 
         await self._ensure_connected()
-
-        mt5_tf = _MT5_TIMEFRAMES[timeframe]
 
         bars = await self._call_with_reconnect(
             lambda: self._connector.get_ohlcv(pair, mt5_tf, count),
