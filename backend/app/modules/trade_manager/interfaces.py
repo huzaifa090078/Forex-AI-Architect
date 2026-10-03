@@ -38,6 +38,7 @@ class OrderRequest:
     signal_id: Optional[str] = None
     notes: str = ""
     metadata: Dict[str, Any] = field(default_factory=dict)
+    dry_run: bool = False
 
 
 @dataclass
@@ -55,7 +56,7 @@ class ITradeManager(ABC):
     """Orchestrates the full trade lifecycle."""
 
     @abstractmethod
-    async def open_trade(self, request: OrderRequest) -> OrderResult:
+    async def open_trade(self, request: OrderRequest, dry_run: bool = False) -> OrderResult:
         """
         Risk-check → send order to broker → persist trade record.
         Returns OrderResult indicating success or failure.

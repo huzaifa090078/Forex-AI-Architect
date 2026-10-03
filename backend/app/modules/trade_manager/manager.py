@@ -84,16 +84,18 @@ class ConcreteTradeManager(BaseTradeManager):
 
     # ─── Core execution ──────────────────────────────────────────────────────
 
-    async def open_trade(self, request: OrderRequest) -> OrderResult:
+    async def open_trade(self, request: OrderRequest, dry_run: bool = False) -> OrderResult:
         """
-        Execute an approved market order end-to-end:
+        Execute an approved market order end-to-end (or perform a safe dry-run):
           1. Validate RiskApproval (inherited gate — raises ValueError on violation).
-          2. Pre-flight sanity checks.
+          2. Pre-flight sanity checks (volume, symbol, direction, SL/TP side).
           3. Duplicate-position protection.
-          4. Send to broker via connector.
-          5. Validate broker response.
-          6. Persist to database.
-          7. Return structured result.
+          4. Market-closed check.
+          5. Dry-run guard: constructs payload, validates, and exits without broker call.
+          6. Send to broker via connector (live execution only).
+          7. Validate broker response.
+          8. Persist to database.
+          9. Return structured result.
         """
         # ── 1. Risk approval gate (raises ValueError if invalid) ──────────────
         self._validate_risk_approval(request)
@@ -108,26 +110,122 @@ class ConcreteTradeManager(BaseTradeManager):
         if request.stop_loss <= 0 or request.take_profit <= 0:
             return OrderResult(success=False, error_message="SL and TP must be positive prices")
 
-        # ── 3. Duplicate-position protection ──────────────────────────────────
-        if settings.TRADE_PREVENT_DUPLICATE_SYMBOL or settings.TRADE_PREVENT_DUPLICATE_DIRECTION:
-            async with AsyncSessionLocal() as db:
-                direction_check = request.direction if settings.TRADE_PREVENT_DUPLICATE_DIRECTION else None
-                duplicates = await TradeService.get_open_trades_for_pair(db, request.pair, direction_check)
-            if duplicates:
-                scope = "symbol+direction" if settings.TRADE_PREVENT_DUPLICATE_DIRECTION else "symbol"
+        # Directional SL / TP placement check
+        if request.direction == "buy":
+            if request.stop_loss >= request.entry_price:
                 return OrderResult(
                     success=False,
-                    error_message=(
-                        f"Duplicate trade blocked: {request.pair} already has an open "
-                        f"position ({scope} protection)"
-                    ),
+                    error_message=f"BUY invalid: stop loss {request.stop_loss} must be below entry {request.entry_price}",
+                )
+            if request.take_profit <= request.entry_price:
+                return OrderResult(
+                    success=False,
+                    error_message=f"BUY invalid: take profit {request.take_profit} must be above entry {request.entry_price}",
+                )
+        elif request.direction == "sell":
+            if request.stop_loss <= request.entry_price:
+                return OrderResult(
+                    success=False,
+                    error_message=f"SELL invalid: stop loss {request.stop_loss} must be above entry {request.entry_price}",
+                )
+            if request.take_profit >= request.entry_price:
+                return OrderResult(
+                    success=False,
+                    error_message=f"SELL invalid: take profit {request.take_profit} must be below entry {request.entry_price}",
                 )
 
-        # ── 4. Send to broker ─────────────────────────────────────────────────
+        # ── 3. Duplicate-position protection ──────────────────────────────────
+        if settings.TRADE_PREVENT_DUPLICATE_SYMBOL or settings.TRADE_PREVENT_DUPLICATE_DIRECTION:
+            try:
+                async with AsyncSessionLocal() as db:
+                    direction_check = request.direction if settings.TRADE_PREVENT_DUPLICATE_DIRECTION else None
+                    duplicates = await TradeService.get_open_trades_for_pair(db, request.pair, direction_check)
+                if duplicates:
+                    scope = "symbol+direction" if settings.TRADE_PREVENT_DUPLICATE_DIRECTION else "symbol"
+                    return OrderResult(
+                        success=False,
+                        error_message=(
+                            f"Duplicate trade blocked: {request.pair} already has an open "
+                            f"position ({scope} protection)"
+                        ),
+                    )
+            except Exception as db_exc:
+                logger.debug("Duplicate check DB query skipped/unavailable: %s", db_exc)
+
+        # ── 4. Market-closed protection ───────────────────────────────────────
+        from app.modules.market_scanner.session import is_forex_market_open
+        market_open = is_forex_market_open()
+        is_dry_run = dry_run or getattr(request, "dry_run", False) or request.metadata.get("dry_run", False)
+
+        if not market_open and not is_dry_run:
+            logger.info("open_trade: blocked because forex market is currently closed.")
+            return OrderResult(
+                success=False,
+                error_message="ORDER BLOCKED: MARKET CLOSED (Weekend)",
+            )
+
+        # ── 5. Safe Dry-Run Execution Guard ───────────────────────────────────
         comment = (
             f"{settings.TRADE_BOT_COMMENT_PREFIX}:"
             f"{request.signal_id or 'manual'}"
         )
+        magic = getattr(settings, "TRADE_BOT_MAGIC_NUMBER", 1001)
+
+        if is_dry_run:
+            order_type_str = "ORDER_TYPE_BUY (0)" if request.direction == "buy" else "ORDER_TYPE_SELL (1)"
+            sanitized_mt5_payload = {
+                "action": "TRADE_ACTION_DEAL (1)",
+                "symbol": request.pair.upper(),
+                "direction": request.direction.upper(),
+                "volume": float(request.lot_size),
+                "type": order_type_str,
+                "price": float(request.entry_price),
+                "sl": float(request.stop_loss),
+                "tp": float(request.take_profit),
+                "magic": int(magic),
+                "comment": comment,
+                "type_time": "ORDER_TIME_GTC (0)",
+                "type_filling": "ORDER_FILLING_IOC (1)",
+            }
+            risk_amt = getattr(request.risk_approval, "actual_risk", 0.0) if request.risk_approval else 0.0
+            rr = getattr(request.risk_approval, "rr_ratio", 0.0) if request.risk_approval else 0.0
+
+            logger.info(
+                "DRY RUN ONLY — ORDER NOT SENT: %s %s %.2f lots @ %.5f [SL=%.5f, TP=%.5f] (Execution call NOT made)",
+                request.direction.upper(), request.pair.upper(), request.lot_size, request.entry_price,
+                request.stop_loss, request.take_profit,
+            )
+
+            return OrderResult(
+                success=True,
+                broker_order_id="DRY_RUN_SIMULATED",
+                fill_price=request.entry_price,
+                fill_time=datetime.now(timezone.utc),
+                error_message="DRY RUN ONLY — ORDER NOT SENT",
+                metadata={
+                    "dry_run": True,
+                    "execution_call_made": False,
+                    "symbol": request.pair.upper(),
+                    "direction": request.direction,
+                    "volume": float(request.lot_size),
+                    "entry_price": float(request.entry_price),
+                    "stop_loss": float(request.stop_loss),
+                    "take_profit": float(request.take_profit),
+                    "risk_amount": float(risk_amt),
+                    "risk_percentage": float(settings.RISK_PER_TRADE_PERCENT),
+                    "rr_ratio": float(rr),
+                    "magic_number": int(magic),
+                    "comment": comment,
+                    "order_type": "buy" if request.direction == "buy" else "sell",
+                    "time_in_force": "ORDER_TIME_GTC",
+                    "filling_mode": "ORDER_FILLING_IOC",
+                    "market_open": market_open,
+                    "market_status": "OPEN" if market_open else "CLOSED (Weekend)",
+                    "mt5_request_payload": sanitized_mt5_payload,
+                },
+            )
+
+        # ── 6. Send to broker (LIVE ORDERS ONLY) ───────────────────────────────
         try:
             broker_resp = await self._connector.send_market_order(
                 symbol=request.pair.upper(),

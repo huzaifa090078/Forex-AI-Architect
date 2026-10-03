@@ -34,6 +34,32 @@ class TradingSession(str, Enum):
     NEW_YORK  = "New York"
     OVERLAP   = "London/NY Overlap"
     OFF_HOURS = "Off Hours"
+    WEEKEND   = "Weekend (Market Closed)"
+
+
+def is_forex_market_open(dt: Optional[datetime] = None) -> bool:
+    """
+    Check if the global Forex market is currently open.
+    The forex market operates 24/5:
+    - Closes on Friday at 22:00 UTC (or 21:00 UTC depending on DST).
+    - Opens on Sunday at 21:00 UTC.
+    - Closed all of Saturday and Sunday prior to 21:00 UTC.
+    """
+    if dt is None:
+        dt = datetime.now(timezone.utc)
+    elif dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+
+    weekday = dt.weekday()  # Monday=0, ..., Friday=4, Saturday=5, Sunday=6
+    hour = dt.hour
+
+    if weekday == 5:  # Saturday — strictly closed
+        return False
+    if weekday == 6 and hour < 21:  # Sunday before 21:00 UTC — closed
+        return False
+    if weekday == 4 and hour >= 22:  # Friday after 22:00 UTC — closed
+        return False
+    return True
 
 
 def get_current_session(dt: Optional[datetime] = None) -> TradingSession:
@@ -49,14 +75,17 @@ def get_current_session(dt: Optional[datetime] = None) -> TradingSession:
     Returns
     -------
     TradingSession
-        The dominant session at the given time.  When both London and
-        New York are open (12:00–16:00 UTC), OVERLAP is returned.
+        The dominant session at the given time.  When the forex market
+        is closed on weekends, WEEKEND is returned.
     """
     if dt is None:
         dt = datetime.now(timezone.utc)
     elif dt.tzinfo is None:
         # Treat naive datetime as UTC — consistent with the rest of the project
         dt = dt.replace(tzinfo=timezone.utc)
+
+    if not is_forex_market_open(dt):
+        return TradingSession.WEEKEND
 
     hour: int = dt.hour  # 0–23 UTC
 

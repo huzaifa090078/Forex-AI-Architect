@@ -151,6 +151,8 @@ class Settings(BaseSettings):
     # ── Trade Manager (Section 9) ─────────────────────────────────────────────
     # Comment prefix stamped on every broker order so the bot can identify its own positions.
     TRADE_BOT_COMMENT_PREFIX: str = Field(default="AIBot")
+    # Unique magic number assigned to bot-managed orders
+    TRADE_BOT_MAGIC_NUMBER: int = Field(default=1001)
     # How often (seconds) the monitoring loop syncs open positions with the broker.
     TRADE_MONITOR_INTERVAL_SECONDS: int = Field(default=30)
     # Block a new trade if the same symbol already has any open position (any direction).

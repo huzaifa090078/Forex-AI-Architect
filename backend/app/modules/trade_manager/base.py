@@ -62,7 +62,7 @@ class BaseTradeManager(ITradeManager):
                 "Re-run approve_trade() with the current parameters."
             )
 
-    async def open_trade(self, request: OrderRequest) -> OrderResult:
+    async def open_trade(self, request: OrderRequest, dry_run: bool = False) -> OrderResult:
         # Enforce Risk Manager gate — raises ValueError on any violation.
         self._validate_risk_approval(request)
         raise NotImplementedError("Implement: risk check → MT5 order → DB insert")
