@@ -10,19 +10,16 @@
 
 import { useEffect, useRef, useState, useCallback, memo } from "react";
 import { createChart, ColorType, CandlestickSeries, LineSeries } from "lightweight-charts";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
   RefreshCw,
-  TrendingUp,
   Layers,
   AlertTriangle,
-  Maximize2,
   BarChart2,
   Activity,
-  Sliders,
 } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 
@@ -91,7 +88,7 @@ function computeEMA(candles: Candle[], period: number) {
 
 /**
  * Official TradingView Advanced Real-Time Chart Widget
- * Includes full side price scale, left drawing tools, indicators, and time range bar.
+ * Sized to 100% of the chart container so it fills the entire section.
  */
 const TradingViewAdvancedWidget = memo(function TradingViewAdvancedWidget({
   symbol,
@@ -114,6 +111,7 @@ const TradingViewAdvancedWidget = memo(function TradingViewAdvancedWidget({
     widgetDiv.className = "tradingview-widget-container__widget";
     widgetDiv.style.height = "100%";
     widgetDiv.style.width = "100%";
+    widgetDiv.style.minHeight = "680px";
     container.appendChild(widgetDiv);
 
     const script = document.createElement("script");
@@ -121,7 +119,9 @@ const TradingViewAdvancedWidget = memo(function TradingViewAdvancedWidget({
     script.type = "text/javascript";
     script.async = true;
     script.innerHTML = JSON.stringify({
-      autosize: true,
+      autosize: false,
+      width: "100%",
+      height: "100%",
       symbol: symbol,
       interval: interval,
       timezone: "Etc/UTC",
@@ -154,8 +154,19 @@ const TradingViewAdvancedWidget = memo(function TradingViewAdvancedWidget({
     <div
       ref={containerRef}
       className="tradingview-widget-container w-full h-full"
-      style={{ height: "100%", width: "100%", minHeight: "620px" }}
-    />
+      style={{ height: "calc(100vh - 220px)", minHeight: "680px", width: "100%" }}
+    >
+      <style>{`
+        .tradingview-widget-container,
+        .tradingview-widget-container__widget,
+        .tradingview-widget-container iframe {
+          width: 100% !important;
+          height: 100% !important;
+          min-height: 680px !important;
+          display: block !important;
+        }
+      `}</style>
+    </div>
   );
 });
 
@@ -365,7 +376,7 @@ export default function ChartsPage() {
   }, [candles, showEma20, showEma50, showSmc, smcStructures, activeTab]);
 
   return (
-    <div className="space-y-3 animate-in fade-in duration-500 min-h-[calc(100vh-100px)] flex flex-col">
+    <div className="space-y-3 animate-in fade-in duration-500 w-full flex flex-col">
       {/* Top Header & Mode Switcher */}
       <div className="flex items-center justify-between flex-wrap gap-3 flex-shrink-0">
         <div>
@@ -376,7 +387,7 @@ export default function ChartsPage() {
             </Badge>
           </div>
           <p className="text-muted-foreground text-xs mt-0.5">
-            Interactive chart with full drawing tools, indicators, side price scale, and date ranges
+            Full-screen interactive chart with drawing tools, indicators, and precision price scale
           </p>
         </div>
 
@@ -521,11 +532,14 @@ export default function ChartsPage() {
         )}
       </div>
 
-      {/* Main Chart Card */}
-      <Card className="flex-1 min-h-[640px] bg-card/60 border-border/50 shadow-xl overflow-hidden flex flex-col">
-        <CardContent className="p-0 flex-1 w-full h-full min-h-[640px]">
+      {/* Main Chart Card — fills full section without blank gap */}
+      <Card
+        className="w-full bg-card/60 border-border/50 shadow-xl overflow-hidden"
+        style={{ height: "calc(100vh - 210px)", minHeight: "680px" }}
+      >
+        <CardContent className="p-0 w-full h-full">
           {activeTab === "tradingview" ? (
-            <div className="w-full h-full min-h-[640px]">
+            <div className="w-full h-full" style={{ height: "100%", width: "100%" }}>
               <TradingViewAdvancedWidget
                 symbol={tvSymbol}
                 interval={tvInterval}
@@ -554,7 +568,8 @@ export default function ChartsPage() {
           ) : (
             <div
               ref={chartContainerRef}
-              className="w-full h-full min-h-[640px]"
+              className="w-full h-full"
+              style={{ height: "100%", width: "100%" }}
             />
           )}
         </CardContent>
