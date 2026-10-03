@@ -54,7 +54,7 @@ function ThemedToaster() {
 
 function App() {
   return (
-    <ThemeProvider defaultTheme="light" storageKey="nexus-ui-theme">
+    <ThemeProvider defaultTheme="dark" storageKey="nexus-ui-theme">
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useGetDashboardSummary, useGetDashboardPerformance, useGetActiveSignals } from "@workspace/api-client-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency, formatNumber, formatPercent, cn } from "@/lib/utils";
 import {
@@ -19,6 +19,10 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Layers,
+  Sliders,
+  Percent,
+  Lock,
+  Zap,
 } from "lucide-react";
 import { ResponsiveContainer, Area, AreaChart, CartesianGrid, XAxis, YAxis, Tooltip } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -159,64 +163,67 @@ export default function DashboardPage() {
   const isConnected = mt5Data?.connected ?? false;
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* ─── Top Header ────────────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/40 pb-5">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      {/* ─── Top Terminal Header ────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/50 pb-4">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-extrabold tracking-tight">Command Center</h1>
-            <Badge variant="outline" className="text-[11px] font-mono border-primary/30 text-primary">
-              DEMO MODE
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground font-mono">
+              Command Center
+            </h1>
+            <Badge variant="terminal" className="text-[10px] tracking-widest uppercase">
+              LIVE TELEMETRY
             </Badge>
           </div>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Live MetaTrader 5 execution bridge, real-time portfolio metrics & algorithmic telemetry.
+          <p className="text-xs text-muted-foreground mt-1 font-mono">
+            MetaTrader 5 execution bridge · Institutional portfolio metrics · AI algorithmic telemetry
           </p>
         </div>
 
-        <div className="flex items-center flex-wrap gap-3">
+        <div className="flex items-center flex-wrap gap-2.5">
           {/* MT5 Connection Badge */}
           <div className={cn(
-            "flex items-center gap-2 px-3 py-1.5 rounded-md border text-xs font-mono font-semibold transition-all shadow-sm",
+            "flex items-center gap-2 px-3 py-1.5 rounded-md border text-xs font-mono font-medium transition-all shadow-2xs",
             isConnected
-              ? "bg-emerald-950/40 border-emerald-500/40 text-emerald-400"
-              : "bg-red-950/40 border-red-500/40 text-red-400"
+              ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+              : "bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400"
           )}>
             <div className={cn(
-              "w-2.5 h-2.5 rounded-full",
-              isConnected ? "bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" : "bg-red-400"
+              "w-2 h-2 rounded-full",
+              isConnected ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" : "bg-rose-500"
             )} />
             <span>
-              {isMT5Loading ? "CONNECTING..." : isConnected ? "MT5 CONNECTED" : "MT5 DISCONNECTED"}
+              {isMT5Loading ? "CONNECTING..." : isConnected ? "MT5 CONNECTED" : "MT5 OFFLINE"}
             </span>
             {account && (
-              <span className="text-muted-foreground border-l border-border/50 pl-2">
-                {account.server}
+              <span className="text-muted-foreground border-l border-border/60 pl-2 text-[11px]">
+                {account.server} · #{account.login}
               </span>
             )}
           </div>
 
-          {/* Refresh Action */}
+          {/* Sync MT5 Action */}
           <Button
             variant="outline"
             size="sm"
             onClick={() => refetchMT5()}
             disabled={isMT5Fetching}
-            className="h-8 gap-1.5 text-xs font-mono border-border/60 bg-card/40 hover:bg-card"
-            title="Refresh MT5 data"
+            className="h-8 gap-1.5 text-xs font-mono border-border/60 bg-card/60 hover:bg-card hover:border-primary/40 cursor-pointer shadow-2xs"
+            title="Refresh MT5 data from terminal"
           >
             <RefreshCw className={cn("w-3.5 h-3.5", isMT5Fetching && "animate-spin text-primary")} />
             <span>{isMT5Fetching ? "SYNCING..." : "SYNC"}</span>
           </Button>
 
-          {/* Bot State */}
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-card/60 border border-border/50 rounded-md shadow-sm">
-            <div className={cn("w-2 h-2 rounded-full",
-              isSummaryLoading ? "bg-muted" :
+          {/* Bot Engine State */}
+          <div className="flex items-center gap-2 px-2.5 py-1.5 bg-card/60 border border-border/50 rounded-md shadow-2xs text-xs font-mono">
+            <div className={cn(
+              "w-2 h-2 rounded-full",
+              isSummaryLoading ? "bg-muted-foreground" :
               summary?.botStatus === "running" ? "bg-emerald-500 animate-pulse" :
-              summary?.botStatus === "paused" ? "bg-amber-500" : "bg-red-500"
+              summary?.botStatus === "paused" ? "bg-amber-500" : "bg-rose-500"
             )} />
-            <span className="text-xs font-mono font-bold uppercase tracking-wider text-muted-foreground">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
               {isSummaryLoading ? "---" : summary?.botStatus || "ACTIVE"}
             </span>
           </div>
@@ -224,25 +231,25 @@ export default function DashboardPage() {
       </div>
 
       {/* ─── MT5 Account Snapshot Bar ─────────────────────────────────────── */}
-      <Card className="bg-gradient-to-r from-card/80 via-card/50 to-background border-border/60 shadow-lg">
-        <CardHeader className="py-3 px-6 border-b border-border/40 flex flex-row items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <Server className="w-4 h-4 text-primary" />
-            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              MetaTrader 5 Account Details
+      <Card className="border-border/60 bg-card/60 backdrop-blur-sm shadow-sm overflow-hidden">
+        <CardHeader className="py-2.5 px-5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Server className="w-3.5 h-3.5 text-primary" />
+            <span className="text-[11px] font-mono font-bold uppercase tracking-widest text-muted-foreground">
+              MetaTrader 5 Account Telemetry
             </span>
           </div>
           {account && (
-            <div className="flex items-center gap-4 text-xs font-mono text-muted-foreground">
-              <span>Login: <strong className="text-foreground">{account.login}</strong></span>
+            <div className="hidden sm:flex items-center gap-4 text-[11px] font-mono text-muted-foreground">
+              <span>Login: <strong className="text-foreground">#{account.login}</strong></span>
               <span>Server: <strong className="text-foreground">{account.server}</strong></span>
-              <span>Company: <strong className="text-foreground">{account.company || "Exness"}</strong></span>
               <span>Leverage: <strong className="text-foreground">1:{account.leverage}</strong></span>
+              <span>Company: <strong className="text-foreground">{account.company || "Exness"}</strong></span>
             </div>
           )}
         </CardHeader>
-        <CardContent className="p-6">
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
+        <CardContent className="p-4 sm:p-5">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
             <MT5MetricItem
               label="BALANCE"
               value={account ? `$${account.balance.toFixed(2)}` : "---"}
@@ -268,7 +275,7 @@ export default function DashboardPage() {
               sub="Open Positions"
               valueColor={
                 !account || account.floating_pnl === 0 ? "text-muted-foreground" :
-                account.floating_pnl > 0 ? "text-emerald-400" : "text-red-400"
+                account.floating_pnl > 0 ? "text-emerald-500 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400"
               }
               loading={isMT5Loading}
             />
@@ -278,17 +285,17 @@ export default function DashboardPage() {
               sub="Closed Today"
               valueColor={
                 !stats || stats.today_realized_pnl === 0 ? "text-muted-foreground" :
-                stats.today_realized_pnl > 0 ? "text-emerald-400" : "text-red-400"
+                stats.today_realized_pnl > 0 ? "text-emerald-500 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400"
               }
               loading={isMT5Loading}
             />
             <MT5MetricItem
               label="NET REALIZED"
               value={stats ? (stats.net_realized_pnl > 0 ? `+$${stats.net_realized_pnl.toFixed(2)}` : `$${stats.net_realized_pnl.toFixed(2)}`) : "---"}
-              sub="Total P/L"
+              sub="30d Closed P/L"
               valueColor={
                 !stats || stats.net_realized_pnl === 0 ? "text-muted-foreground" :
-                stats.net_realized_pnl > 0 ? "text-emerald-400" : "text-red-400"
+                stats.net_realized_pnl > 0 ? "text-emerald-500 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400"
               }
               loading={isMT5Loading}
             />
@@ -308,67 +315,93 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
-      {/* ─── P/L Distinction Banner ────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="flex items-center gap-3 p-3.5 rounded-lg border border-blue-500/20 bg-blue-950/20 text-blue-300 text-xs font-mono">
-          <Layers className="w-4 h-4 text-blue-400 shrink-0" />
-          <div>
-            <strong className="text-blue-200">FLOATING P/L (Unrealized):</strong> Dynamically fluctuates with live market ticks on active open positions. Does not change account balance until closed.
+      {/* ─── P/L Distinction & Risk Controls Banner ────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Floating P/L Explainer */}
+        <div className="flex items-start gap-3 p-3.5 rounded-lg border border-primary/25 bg-card/40 text-xs font-mono">
+          <Layers className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+          <div className="space-y-0.5">
+            <div className="font-bold text-foreground tracking-wide">FLOATING P/L (Unrealized)</div>
+            <p className="text-muted-foreground leading-relaxed text-[11px]">
+              Fluctuates in real time with live broker ticks on active open positions. Does not affect account balance until position is closed.
+            </p>
           </div>
         </div>
-        <div className="flex items-center gap-3 p-3.5 rounded-lg border border-emerald-500/20 bg-emerald-950/20 text-emerald-300 text-xs font-mono">
-          <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-          <div>
-            <strong className="text-emerald-200">REALIZED P/L (Closed):</strong> Confirmed profits/losses from closed trade deals including commissions & swaps. Settled into account balance.
+
+        {/* Realized P/L Explainer */}
+        <div className="flex items-start gap-3 p-3.5 rounded-lg border border-emerald-500/25 bg-card/40 text-xs font-mono">
+          <ShieldCheck className="w-4 h-4 text-emerald-500 dark:text-emerald-400 shrink-0 mt-0.5" />
+          <div className="space-y-0.5">
+            <div className="font-bold text-foreground tracking-wide">REALIZED P/L (Settled)</div>
+            <p className="text-muted-foreground leading-relaxed text-[11px]">
+              Confirmed profit or loss from completed MT5 deals, including commissions and swaps. Settled permanently into account balance.
+            </p>
+          </div>
+        </div>
+
+        {/* Risk Management Overview Card */}
+        <div className="flex items-start gap-3 p-3.5 rounded-lg border border-border/60 bg-card/40 text-xs font-mono">
+          <Sliders className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+          <div className="space-y-1 w-full">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-foreground tracking-wide">RISK CONTROLS</span>
+              <span className="text-[10px] text-emerald-500 dark:text-emerald-400 font-bold">FAIL-CLOSED</span>
+            </div>
+            <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] text-muted-foreground pt-0.5">
+              <span>Risk/Trade: <strong className="text-foreground">1.0%</strong></span>
+              <span>Target R:R: <strong className="text-foreground">1:2.0</strong></span>
+              <span>Max Trades: <strong className="text-foreground">5 Open</strong></span>
+              <span>Daily Loss: <strong className="text-foreground">5.0% Limit</strong></span>
+            </div>
           </div>
         </div>
       </div>
 
       {/* ─── MT5 Open Positions Section ───────────────────────────────────── */}
-      <Card className="bg-card/50 backdrop-blur border-border/50 shadow-lg">
-        <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-border/40">
+      <Card className="border-border/60 bg-card/60 backdrop-blur-sm shadow-sm overflow-hidden">
+        <CardHeader className="flex flex-row items-center justify-between py-3 px-5 border-b border-border/40 bg-muted/20">
           <div className="flex items-center gap-2">
             <Activity className="w-4 h-4 text-primary" />
-            <CardTitle className="text-sm font-bold uppercase tracking-wider">
+            <CardTitle className="text-xs font-mono font-bold uppercase tracking-wider text-foreground">
               Live Open Positions (MetaTrader 5)
             </CardTitle>
-            <Badge variant="secondary" className="font-mono text-xs ml-2">
-              {positions.length} Active
+            <Badge variant="terminal" className="text-[10px] ml-1">
+              {positions.length} ACTIVE
             </Badge>
           </div>
           <div className="text-xs font-mono text-muted-foreground flex items-center gap-2">
             <span>Floating Net:</span>
             <span className={cn(
-              "font-bold",
-              (stats?.total_floating_pnl ?? 0) > 0 ? "text-emerald-400" :
-              (stats?.total_floating_pnl ?? 0) < 0 ? "text-red-400" : "text-muted-foreground"
+              "font-bold text-sm",
+              (stats?.total_floating_pnl ?? 0) > 0 ? "text-emerald-500 dark:text-emerald-400" :
+              (stats?.total_floating_pnl ?? 0) < 0 ? "text-rose-500 dark:text-rose-400" : "text-muted-foreground"
             )}>
-              ${(stats?.total_floating_pnl ?? 0).toFixed(2)}
+              {(stats?.total_floating_pnl ?? 0) > 0 ? `+$${(stats?.total_floating_pnl ?? 0).toFixed(2)}` : `$${(stats?.total_floating_pnl ?? 0).toFixed(2)}`}
             </span>
           </div>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow className="bg-muted/30">
-                <TableHead className="w-[110px] pl-6">Ticket</TableHead>
-                <TableHead>Symbol</TableHead>
-                <TableHead>Direction</TableHead>
-                <TableHead>Volume</TableHead>
-                <TableHead>Open Price</TableHead>
-                <TableHead>Current Price</TableHead>
-                <TableHead>Stop Loss</TableHead>
-                <TableHead>Take Profit</TableHead>
-                <TableHead>Swap</TableHead>
-                <TableHead>Floating P/L</TableHead>
-                <TableHead className="pr-6">Open Time</TableHead>
+              <TableRow className="bg-muted/30 border-b border-border/40">
+                <TableHead className="w-[100px] pl-5 font-mono text-[11px]">Ticket</TableHead>
+                <TableHead className="font-mono text-[11px]">Symbol</TableHead>
+                <TableHead className="font-mono text-[11px]">Direction</TableHead>
+                <TableHead className="font-mono text-[11px]">Volume</TableHead>
+                <TableHead className="font-mono text-[11px]">Open Price</TableHead>
+                <TableHead className="font-mono text-[11px]">Current Price</TableHead>
+                <TableHead className="font-mono text-[11px]">Stop Loss</TableHead>
+                <TableHead className="font-mono text-[11px]">Take Profit</TableHead>
+                <TableHead className="font-mono text-[11px]">Swap</TableHead>
+                <TableHead className="font-mono text-[11px]">Floating P/L</TableHead>
+                <TableHead className="pr-5 font-mono text-[11px]">Open Time</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isMT5Loading ? (
                 Array.from({ length: 2 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell className="pl-6"><Skeleton className="h-4 w-16" /></TableCell>
+                    <TableCell className="pl-5"><Skeleton className="h-4 w-16" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-16" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-12" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-10" /></TableCell>
@@ -378,23 +411,23 @@ export default function DashboardPage() {
                     <TableCell><Skeleton className="h-4 w-14" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-10" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                    <TableCell className="pr-6"><Skeleton className="h-4 w-24" /></TableCell>
+                    <TableCell className="pr-5"><Skeleton className="h-4 w-24" /></TableCell>
                   </TableRow>
                 ))
               ) : positions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={11} className="h-28 text-center text-muted-foreground border-dashed">
-                    <div className="flex flex-col items-center justify-center gap-1.5 opacity-70">
-                      <Clock className="w-5 h-5 text-muted-foreground" />
-                      <span className="font-mono text-xs">NO_OPEN_POSITIONS_IN_MT5</span>
-                      <span className="text-[11px] text-muted-foreground">Demo account is ready. No trades currently open.</span>
+                  <TableCell colSpan={11} className="h-24 text-center text-muted-foreground border-dashed">
+                    <div className="flex flex-col items-center justify-center gap-1.5 opacity-80">
+                      <Clock className="w-5 h-5 text-muted-foreground/60" />
+                      <span className="font-mono text-xs font-semibold text-foreground">NO OPEN POSITIONS IN MT5</span>
+                      <span className="text-[11px] text-muted-foreground font-mono">Demo account ready. Algorithmic trade scanner running.</span>
                     </div>
                   </TableCell>
                 </TableRow>
               ) : (
                 positions.map((p) => (
                   <TableRow key={p.ticket} className="font-mono text-xs hover:bg-muted/30 transition-colors">
-                    <TableCell className="pl-6 font-bold text-foreground">#{p.ticket}</TableCell>
+                    <TableCell className="pl-5 font-bold text-foreground">#{p.ticket}</TableCell>
                     <TableCell className="font-bold text-primary">{p.symbol}</TableCell>
                     <TableCell>
                       <Badge variant={p.direction === "buy" ? "buy" : "sell"} className="text-[10px] uppercase font-bold px-2 py-0.5">
@@ -409,12 +442,12 @@ export default function DashboardPage() {
                     <TableCell>{p.swap ? `$${p.swap.toFixed(2)}` : "$0.00"}</TableCell>
                     <TableCell className={cn(
                       "font-bold text-sm",
-                      p.floating_pnl > 0 ? "text-emerald-400" :
-                      p.floating_pnl < 0 ? "text-red-400" : "text-muted-foreground"
+                      p.floating_pnl > 0 ? "text-emerald-500 dark:text-emerald-400" :
+                      p.floating_pnl < 0 ? "text-rose-500 dark:text-rose-400" : "text-muted-foreground"
                     )}>
                       {p.floating_pnl > 0 ? `+$${p.floating_pnl.toFixed(2)}` : `$${p.floating_pnl.toFixed(2)}`}
                     </TableCell>
-                    <TableCell className="pr-6 text-muted-foreground text-[11px]">
+                    <TableCell className="pr-5 text-muted-foreground text-[11px]">
                       {formatDateTime(p.open_time)}
                     </TableCell>
                   </TableRow>
@@ -426,51 +459,51 @@ export default function DashboardPage() {
       </Card>
 
       {/* ─── MT5 Closed Trade History Section ─────────────────────────────── */}
-      <Card className="bg-card/50 backdrop-blur border-border/50 shadow-lg">
-        <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-border/40">
+      <Card className="border-border/60 bg-card/60 backdrop-blur-sm shadow-sm overflow-hidden">
+        <CardHeader className="flex flex-row items-center justify-between py-3 px-5 border-b border-border/40 bg-muted/20">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            <CardTitle className="text-sm font-bold uppercase tracking-wider">
+            <CheckCircle2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
+            <CardTitle className="text-xs font-mono font-bold uppercase tracking-wider text-foreground">
               Closed Trade History (MT5 Deals)
             </CardTitle>
-            <Badge variant="secondary" className="font-mono text-xs ml-2">
-              {history.length} Executed Deals
+            <Badge variant="terminal" className="text-[10px] ml-1">
+              {history.length} EXECUTED
             </Badge>
           </div>
           <div className="text-xs font-mono text-muted-foreground flex items-center gap-2">
             <span>Net Realized:</span>
             <span className={cn(
-              "font-bold",
-              (stats?.net_realized_pnl ?? 0) > 0 ? "text-emerald-400" :
-              (stats?.net_realized_pnl ?? 0) < 0 ? "text-red-400" : "text-muted-foreground"
+              "font-bold text-sm",
+              (stats?.net_realized_pnl ?? 0) > 0 ? "text-emerald-500 dark:text-emerald-400" :
+              (stats?.net_realized_pnl ?? 0) < 0 ? "text-rose-500 dark:text-rose-400" : "text-muted-foreground"
             )}>
-              ${(stats?.net_realized_pnl ?? 0).toFixed(2)}
+              {(stats?.net_realized_pnl ?? 0) > 0 ? `+$${(stats?.net_realized_pnl ?? 0).toFixed(2)}` : `$${(stats?.net_realized_pnl ?? 0).toFixed(2)}`}
             </span>
           </div>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow className="bg-muted/30">
-                <TableHead className="w-[110px] pl-6">Deal ID</TableHead>
-                <TableHead>Order ID</TableHead>
-                <TableHead>Symbol</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Entry</TableHead>
-                <TableHead>Volume</TableHead>
-                <TableHead>Price</TableHead>
-                <TableHead>Commission</TableHead>
-                <TableHead>Swap</TableHead>
-                <TableHead>Realized P/L</TableHead>
-                <TableHead>Net Profit</TableHead>
-                <TableHead className="pr-6">Execution Time</TableHead>
+              <TableRow className="bg-muted/30 border-b border-border/40">
+                <TableHead className="w-[100px] pl-5 font-mono text-[11px]">Deal ID</TableHead>
+                <TableHead className="font-mono text-[11px]">Order ID</TableHead>
+                <TableHead className="font-mono text-[11px]">Symbol</TableHead>
+                <TableHead className="font-mono text-[11px]">Type</TableHead>
+                <TableHead className="font-mono text-[11px]">Entry</TableHead>
+                <TableHead className="font-mono text-[11px]">Volume</TableHead>
+                <TableHead className="font-mono text-[11px]">Price</TableHead>
+                <TableHead className="font-mono text-[11px]">Commission</TableHead>
+                <TableHead className="font-mono text-[11px]">Swap</TableHead>
+                <TableHead className="font-mono text-[11px]">Realized P/L</TableHead>
+                <TableHead className="font-mono text-[11px]">Net Profit</TableHead>
+                <TableHead className="pr-5 font-mono text-[11px]">Execution Time</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isMT5Loading ? (
                 Array.from({ length: 2 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell className="pl-6"><Skeleton className="h-4 w-16" /></TableCell>
+                    <TableCell className="pl-5"><Skeleton className="h-4 w-16" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-16" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-16" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-12" /></TableCell>
@@ -481,23 +514,23 @@ export default function DashboardPage() {
                     <TableCell><Skeleton className="h-4 w-10" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-16" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                    <TableCell className="pr-6"><Skeleton className="h-4 w-24" /></TableCell>
+                    <TableCell className="pr-5"><Skeleton className="h-4 w-24" /></TableCell>
                   </TableRow>
                 ))
               ) : history.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={12} className="h-28 text-center text-muted-foreground border-dashed">
-                    <div className="flex flex-col items-center justify-center gap-1.5 opacity-70">
-                      <CheckCircle2 className="w-5 h-5 text-muted-foreground" />
-                      <span className="font-mono text-xs">NO_CLOSED_TRADES_IN_HISTORY</span>
-                      <span className="text-[11px] text-muted-foreground">No completed trade executions recorded yet in this testing period.</span>
+                  <TableCell colSpan={12} className="h-24 text-center text-muted-foreground border-dashed">
+                    <div className="flex flex-col items-center justify-center gap-1.5 opacity-80">
+                      <CheckCircle2 className="w-5 h-5 text-muted-foreground/60" />
+                      <span className="font-mono text-xs font-semibold text-foreground">NO CLOSED TRADES IN HISTORY</span>
+                      <span className="text-[11px] text-muted-foreground font-mono">No closed deal settlements logged yet for this account.</span>
                     </div>
                   </TableCell>
                 </TableRow>
               ) : (
                 history.map((d) => (
                   <TableRow key={d.ticket} className="font-mono text-xs hover:bg-muted/30 transition-colors">
-                    <TableCell className="pl-6 font-bold text-foreground">#{d.ticket}</TableCell>
+                    <TableCell className="pl-5 font-bold text-foreground">#{d.ticket}</TableCell>
                     <TableCell className="text-muted-foreground">#{d.order}</TableCell>
                     <TableCell className="font-bold text-primary">{d.symbol || "—"}</TableCell>
                     <TableCell>
@@ -512,19 +545,19 @@ export default function DashboardPage() {
                     <TableCell className="text-muted-foreground">{d.swap ? `$${d.swap.toFixed(2)}` : "$0.00"}</TableCell>
                     <TableCell className={cn(
                       "font-semibold",
-                      d.profit > 0 ? "text-emerald-400" :
-                      d.profit < 0 ? "text-red-400" : "text-muted-foreground"
+                      d.profit > 0 ? "text-emerald-500 dark:text-emerald-400" :
+                      d.profit < 0 ? "text-rose-500 dark:text-rose-400" : "text-muted-foreground"
                     )}>
                       {d.profit > 0 ? `+$${d.profit.toFixed(2)}` : `$${d.profit.toFixed(2)}`}
                     </TableCell>
                     <TableCell className={cn(
                       "font-bold text-sm",
-                      d.net_profit > 0 ? "text-emerald-400" :
-                      d.net_profit < 0 ? "text-red-400" : "text-muted-foreground"
+                      d.net_profit > 0 ? "text-emerald-500 dark:text-emerald-400" :
+                      d.net_profit < 0 ? "text-rose-500 dark:text-rose-400" : "text-muted-foreground"
                     )}>
                       {d.net_profit > 0 ? `+$${d.net_profit.toFixed(2)}` : `$${d.net_profit.toFixed(2)}`}
                     </TableCell>
-                    <TableCell className="pr-6 text-muted-foreground text-[11px]">
+                    <TableCell className="pr-5 text-muted-foreground text-[11px]">
                       {formatDateTime(d.close_time)}
                     </TableCell>
                   </TableRow>
@@ -537,26 +570,28 @@ export default function DashboardPage() {
 
       {/* ─── Performance Chart & Active Signals Section ────────────────────── */}
       <div className="grid gap-6 md:grid-cols-7">
-        <Card className="md:col-span-5 bg-card/50 backdrop-blur border-border/50 shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 border-b border-border/50">
-            <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-              Equity Curve (30d)
+        {/* Equity Curve */}
+        <Card className="md:col-span-5 border-border/60 bg-card/60 backdrop-blur-sm shadow-sm overflow-hidden">
+          <CardHeader className="py-3 px-5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between">
+            <CardTitle className="text-xs font-mono font-bold uppercase tracking-widest text-muted-foreground">
+              Portfolio Equity Curve (30-Day Window)
             </CardTitle>
+            <span className="text-[10px] font-mono text-muted-foreground">DYNAMIC RE-INDEXED</span>
           </CardHeader>
-          <CardContent>
-            <div className="h-[320px] w-full mt-6">
+          <CardContent className="p-4 sm:p-5">
+            <div className="h-[300px] w-full">
               {isPerfLoading ? (
                 <Skeleton className="w-full h-full" />
               ) : performance && performance.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={performance}>
+                  <AreaChart data={performance} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                     <defs>
                       <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} opacity={0.5} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} opacity={0.4} />
                     <XAxis
                       dataKey="date"
                       stroke="hsl(var(--muted-foreground))"
@@ -564,7 +599,7 @@ export default function DashboardPage() {
                       tickLine={false}
                       axisLine={false}
                       tickFormatter={(val) => new Date(val).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                      dy={10}
+                      dy={8}
                     />
                     <YAxis
                       stroke="hsl(var(--muted-foreground))"
@@ -573,14 +608,21 @@ export default function DashboardPage() {
                       axisLine={false}
                       tickFormatter={(val) => `$${val}`}
                       domain={["auto", "auto"]}
-                      dx={-10}
+                      dx={-8}
                     />
                     <Tooltip
-                      contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}
-                      itemStyle={{ color: "hsl(var(--foreground))", fontFamily: "var(--font-mono)", fontWeight: "bold" }}
-                      labelStyle={{ color: "hsl(var(--muted-foreground))", fontSize: "12px", marginBottom: "4px" }}
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        borderColor: "hsl(var(--border))",
+                        borderRadius: "6px",
+                        boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
+                        fontFamily: "var(--font-mono)",
+                        fontSize: "12px",
+                      }}
+                      itemStyle={{ color: "hsl(var(--foreground))", fontWeight: "bold" }}
+                      labelStyle={{ color: "hsl(var(--muted-foreground))", fontSize: "11px", marginBottom: "4px" }}
                       formatter={(value: number) => [formatCurrency(value), "Equity"]}
-                      labelFormatter={(label) => new Date(label).toLocaleDateString()}
+                      labelFormatter={(label) => new Date(label).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
                     />
                     <Area
                       type="monotone"
@@ -593,48 +635,74 @@ export default function DashboardPage() {
                   </AreaChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex h-full items-center justify-center text-muted-foreground font-mono text-sm border border-dashed border-border/50 rounded-lg">
-                  No performance data available
+                <div className="flex h-full items-center justify-center text-muted-foreground font-mono text-xs border border-dashed border-border/40 rounded-lg">
+                  No historical equity points recorded in this window
                 </div>
               )}
             </div>
           </CardContent>
         </Card>
 
-        <Card className="md:col-span-2 bg-card/50 backdrop-blur border-border/50 shadow-lg flex flex-col">
-          <CardHeader className="border-b border-border/50 pb-4">
-            <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-              Active Signals
+        {/* Active Signals Card */}
+        <Card className="md:col-span-2 border-border/60 bg-card/60 backdrop-blur-sm shadow-sm flex flex-col overflow-hidden">
+          <CardHeader className="py-3 px-5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between">
+            <CardTitle className="text-xs font-mono font-bold uppercase tracking-widest text-muted-foreground">
+              Active AI Signals
             </CardTitle>
+            <span className="text-[10px] font-mono text-muted-foreground">SMC / EMA</span>
           </CardHeader>
-          <CardContent className="flex-1 overflow-auto p-4">
+          <CardContent className="flex-1 overflow-auto p-3.5 space-y-2.5">
             {isSignalsLoading ? (
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {[1, 2, 3].map((i) => <Skeleton key={i} className="h-16 w-full" />)}
               </div>
             ) : activeSignals && activeSignals.length > 0 ? (
-              <div className="space-y-3">
-                {activeSignals.slice(0, 6).map((signal) => (
-                  <div key={signal.id} className="flex items-center justify-between p-3 rounded-md border border-border/50 bg-background/30 hover:bg-muted/30 transition-colors">
-                    <div className="flex flex-col gap-1.5">
-                      <span className="font-bold text-sm tracking-wide">{signal.pair}</span>
-                      <span className="text-[10px] uppercase text-muted-foreground font-semibold">{signal.smcPattern || "Signal"}</span>
+              activeSignals.slice(0, 6).map((signal) => (
+                <div
+                  key={signal.id}
+                  className="p-2.5 rounded-md border border-border/50 bg-background/40 hover:bg-muted/30 transition-colors space-y-2 font-mono"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-xs text-foreground">{signal.pair}</span>
+                      <span className="text-[10px] text-muted-foreground">{signal.timeframe || "M15"}</span>
                     </div>
-                    <div className="flex flex-col items-end gap-1.5">
-                      <Badge variant={signal.direction === "buy" ? "buy" : "sell"} className="text-[10px] px-2 py-0.5 rounded shadow-sm">
-                        {signal.direction}
-                      </Badge>
-                      <span className="text-[10px] font-mono text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
-                        {formatPercent(signal.confidence, 0)} conf
-                      </span>
-                    </div>
+                    <Badge
+                      variant={
+                        signal.direction?.toLowerCase() === "buy" ? "buy" :
+                        signal.direction?.toLowerCase() === "sell" ? "sell" : "neutral"
+                      }
+                      className="text-[10px] px-2 py-0.5"
+                    >
+                      {signal.direction || "NO_TRADE"}
+                    </Badge>
                   </div>
-                ))}
-              </div>
+
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span className="truncate max-w-[130px]">{signal.smcPattern || "Order Flow"}</span>
+                    <span className="font-bold text-foreground">
+                      {formatPercent(signal.confidence, 0)} conf
+                    </span>
+                  </div>
+
+                  {/* Confidence mini bar */}
+                  <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={cn(
+                        "h-full rounded-full transition-all",
+                        signal.direction?.toLowerCase() === "buy" ? "bg-emerald-500" :
+                        signal.direction?.toLowerCase() === "sell" ? "bg-rose-500" : "bg-primary"
+                      )}
+                      style={{ width: `${Math.min(100, Math.max(0, (signal.confidence || 0) * 100))}%` }}
+                    />
+                  </div>
+                </div>
+              ))
             ) : (
-              <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm gap-3 opacity-60">
-                <AlertTriangle className="w-8 h-8" />
-                <p className="font-mono text-xs">AWAITING_SIGNALS</p>
+              <div className="flex flex-col items-center justify-center h-full min-h-[160px] text-muted-foreground text-xs gap-2 opacity-75">
+                <AlertTriangle className="w-6 h-6 text-muted-foreground/60" />
+                <span className="font-mono text-xs font-semibold">AWAITING_HIGH_CONFIDENCE_SIGNALS</span>
+                <span className="text-[10px] text-center font-mono">Scanner is evaluating 4-hour and 15-minute institutional order blocks.</span>
               </div>
             )}
           </CardContent>
@@ -661,10 +729,10 @@ function MT5MetricItem({
 }) {
   return (
     <div className={cn(
-      "flex flex-col gap-1 p-3 rounded-lg border transition-all",
+      "flex flex-col gap-1 p-3 rounded-lg border transition-all shadow-2xs",
       highlight
-        ? "bg-primary/5 border-primary/30"
-        : "bg-background/40 border-border/40"
+        ? "bg-primary/10 border-primary/40 shadow-xs"
+        : "bg-background/40 border-border/50 hover:border-border/80"
     )}>
       <span className="text-[10px] font-bold font-mono tracking-wider text-muted-foreground uppercase">
         {label}
@@ -677,7 +745,7 @@ function MT5MetricItem({
         </span>
       )}
       {sub && (
-        <span className="text-[10px] font-mono text-muted-foreground/70">
+        <span className="text-[10px] font-mono text-muted-foreground/80 truncate">
           {sub}
         </span>
       )}

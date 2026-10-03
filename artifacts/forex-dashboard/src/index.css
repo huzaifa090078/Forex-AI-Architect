@@ -74,54 +74,54 @@
   --elevate-1: rgba(0, 0, 0, 0.03);
   --elevate-2: rgba(0, 0, 0, 0.08);
 
-  /* ── Trading platform palette: deep navy + electric teal ── */
-  --background: 220 20% 97%;
-  --foreground: 222 47% 11%;
-  --border: 220 13% 86%;
-  --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
-  --card-border: 220 13% 90%;
-  --sidebar: 0 0% 100%;
-  --sidebar-foreground: 222 47% 11%;
-  --sidebar-border: 220 13% 88%;
-  --sidebar-primary: 174 72% 36%;
+  /* ── Light Mode Palette: Institutional Clean White & Crisp Slate ── */
+  --background: 210 40% 98%;           /* #F8FAFC */
+  --foreground: 222 47% 11%;           /* #0F172A */
+  --border: 214 32% 91%;               /* #E2E8F0 */
+  --card: 0 0% 100%;                   /* #FFFFFF */
+  --card-foreground: 222 47% 11%;      /* #0F172A */
+  --card-border: 214 32% 91%;          /* #E2E8F0 */
+  --sidebar: 0 0% 100%;                /* #FFFFFF */
+  --sidebar-foreground: 222 47% 15%;   /* #1E293B */
+  --sidebar-border: 214 32% 91%;       /* #E2E8F0 */
+  --sidebar-primary: 200 98% 39%;      /* #0284C7 */
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 220 14% 93%;
+  --sidebar-accent: 210 40% 96%;       /* #F1F5F9 */
   --sidebar-accent-foreground: 222 47% 11%;
-  --sidebar-ring: 174 72% 40%;
+  --sidebar-ring: 200 98% 39%;
   --popover: 0 0% 100%;
   --popover-foreground: 222 47% 11%;
-  --popover-border: 220 13% 86%;
-  --primary: 174 72% 40%;
+  --popover-border: 214 32% 91%;
+  --primary: 200 98% 39%;              /* #0284C7 Electric Cyan/Blue */
   --primary-foreground: 0 0% 100%;
-  --secondary: 220 14% 93%;
+  --secondary: 210 40% 96%;
   --secondary-foreground: 222 47% 20%;
-  --muted: 220 14% 93%;
-  --muted-foreground: 220 9% 46%;
-  --accent: 220 14% 88%;
-  --accent-foreground: 222 47% 15%;
-  --destructive: 0 72% 51%;
+  --muted: 210 40% 96%;                /* #F1F5F9 */
+  --muted-foreground: 215 16% 47%;     /* #64748B */
+  --accent: 210 40% 93%;
+  --accent-foreground: 222 47% 11%;
+  --destructive: 0 72% 51%;            /* #DC2626 */
   --destructive-foreground: 0 0% 100%;
-  --input: 220 13% 82%;
-  --ring: 174 72% 40%;
-  --chart-1: 174 72% 40%;
-  --chart-2: 222 47% 40%;
+  --input: 214 32% 88%;
+  --ring: 200 98% 39%;
+  --chart-1: 200 98% 39%;
+  --chart-2: 160 84% 39%;
   --chart-3: 38 92% 50%;
   --chart-4: 0 72% 51%;
   --chart-5: 262 52% 57%;
 
-  --app-font-sans: 'Inter', 'system-ui', sans-serif;
+  --app-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --app-font-serif: Georgia, serif;
-  --app-font-mono: 'JetBrains Mono', 'Fira Code', Menlo, monospace;
+  --app-font-mono: 'JetBrains Mono', 'Fira Code', 'Roboto Mono', Menlo, monospace;
   --radius: 0.5rem;
-  --shadow-2xs: 0px 1px 2px 0px rgba(0,0,0,0.06);
+  --shadow-2xs: 0px 1px 2px 0px rgba(0,0,0,0.05);
   --shadow-xs: 0px 1px 3px 0px rgba(0,0,0,0.08);
-  --shadow-sm: 0px 2px 6px -1px rgba(0,0,0,0.1);
-  --shadow: 0px 4px 12px -2px rgba(0,0,0,0.12);
-  --shadow-md: 0px 8px 24px -4px rgba(0,0,0,0.14);
-  --shadow-lg: 0px 16px 48px -8px rgba(0,0,0,0.16);
-  --shadow-xl: 0px 24px 64px -12px rgba(0,0,0,0.20);
-  --shadow-2xl: 0px 40px 80px -16px rgba(0,0,0,0.25);
+  --shadow-sm: 0px 2px 6px -1px rgba(0,0,0,0.08);
+  --shadow: 0px 4px 12px -2px rgba(0,0,0,0.10);
+  --shadow-md: 0px 8px 24px -4px rgba(0,0,0,0.12);
+  --shadow-lg: 0px 16px 48px -8px rgba(0,0,0,0.14);
+  --shadow-xl: 0px 24px 64px -12px rgba(0,0,0,0.18);
+  --shadow-2xl: 0px 40px 80px -16px rgba(0,0,0,0.20);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
 
@@ -136,55 +136,56 @@
 
 /* DARK MODE */
 .dark {
-  --button-outline: rgba(255, 255, 255, 0.1);
-  --badge-outline: rgba(255, 255, 255, 0.05);
+  --button-outline: rgba(255, 255, 255, 0.12);
+  --badge-outline: rgba(255, 255, 255, 0.08);
   --opaque-button-border-intensity: 9;
   --elevate-1: rgba(255, 255, 255, 0.04);
-  --elevate-2: rgba(255, 255, 255, 0.09);
+  --elevate-2: rgba(255, 255, 255, 0.08);
 
-  --background: 222 47% 8%;
-  --foreground: 210 40% 92%;
-  --border: 222 30% 18%;
-  --card: 222 40% 11%;
-  --card-foreground: 210 40% 92%;
-  --card-border: 222 30% 20%;
-  --sidebar: 222 47% 6%;
-  --sidebar-foreground: 210 40% 88%;
-  --sidebar-border: 222 40% 13%;
-  --sidebar-primary: 174 72% 48%;
-  --sidebar-primary-foreground: 222 47% 6%;
-  --sidebar-accent: 222 40% 15%;
-  --sidebar-accent-foreground: 210 40% 88%;
-  --sidebar-ring: 174 72% 48%;
-  --popover: 222 40% 11%;
-  --popover-foreground: 210 40% 92%;
-  --popover-border: 222 30% 20%;
-  --primary: 174 72% 48%;
-  --primary-foreground: 222 47% 6%;
-  --secondary: 222 30% 16%;
-  --secondary-foreground: 210 40% 80%;
-  --muted: 222 30% 14%;
-  --muted-foreground: 220 9% 55%;
-  --accent: 222 30% 18%;
-  --accent-foreground: 210 40% 88%;
-  --destructive: 0 70% 55%;
+  /* ── Dark Mode Palette: Terminal Charcoal/Navy (#080B12 & #0D121B) with Subtle Neon ── */
+  --background: 223 38% 5%;            /* #080B12 Charcoal Navy */
+  --foreground: 210 40% 96%;           /* #F1F5F9 Crisp Near-White */
+  --border: 219 32% 15%;               /* #1A2333 Subtle Navy Slate */
+  --card: 218 35% 8%;                  /* #0D121B Deep Surface */
+  --card-foreground: 210 40% 96%;      /* #F1F5F9 */
+  --card-border: 219 32% 15%;          /* #1A2333 */
+  --sidebar: 220 38% 6%;               /* #0A0F17 Sidebar */
+  --sidebar-foreground: 210 40% 90%;   /* #E2E8F0 */
+  --sidebar-border: 219 32% 13%;       /* #161D2B */
+  --sidebar-primary: 199 89% 48%;      /* #0EA5E9 Neon Cyan/Blue */
+  --sidebar-primary-foreground: 223 38% 5%;
+  --sidebar-accent: 218 35% 11%;       /* #111824 Elevated */
+  --sidebar-accent-foreground: 210 40% 96%;
+  --sidebar-ring: 199 89% 48%;
+  --popover: 218 35% 9%;               /* #0F1420 */
+  --popover-foreground: 210 40% 96%;
+  --popover-border: 219 32% 16%;
+  --primary: 199 89% 48%;              /* #0EA5E9 Electric Cyan */
+  --primary-foreground: 223 38% 5%;
+  --secondary: 218 36% 11%;            /* #111824 */
+  --secondary-foreground: 210 40% 88%;
+  --muted: 218 36% 10%;                /* #101622 */
+  --muted-foreground: 217 19% 65%;     /* #94A3B8 Readable Cool Gray */
+  --accent: 218 36% 13%;               /* #141B28 */
+  --accent-foreground: 210 40% 96%;
+  --destructive: 350 89% 60%;          /* #F43F5E Clean Red */
   --destructive-foreground: 0 0% 100%;
-  --input: 222 30% 22%;
-  --ring: 174 72% 48%;
-  --chart-1: 174 72% 52%;
-  --chart-2: 210 60% 60%;
-  --chart-3: 38 92% 55%;
-  --chart-4: 0 70% 60%;
+  --input: 219 32% 16%;
+  --ring: 199 89% 48%;
+  --chart-1: 199 89% 48%;              /* Electric Cyan */
+  --chart-2: 160 84% 39%;              /* Neon Green */
+  --chart-3: 38 92% 50%;               /* Amber */
+  --chart-4: 350 89% 60%;              /* Red */
   --chart-5: 262 52% 65%;
 
-  --shadow-2xs: 0px 1px 2px 0px rgba(0,0,0,0.3);
-  --shadow-xs: 0px 1px 3px 0px rgba(0,0,0,0.35);
-  --shadow-sm: 0px 2px 6px -1px rgba(0,0,0,0.4);
-  --shadow: 0px 4px 12px -2px rgba(0,0,0,0.45);
-  --shadow-md: 0px 8px 24px -4px rgba(0,0,0,0.5);
-  --shadow-lg: 0px 16px 48px -8px rgba(0,0,0,0.55);
-  --shadow-xl: 0px 24px 64px -12px rgba(0,0,0,0.6);
-  --shadow-2xl: 0px 40px 80px -16px rgba(0,0,0,0.7);
+  --shadow-2xs: 0px 1px 2px 0px rgba(0,0,0,0.4);
+  --shadow-xs: 0px 1px 3px 0px rgba(0,0,0,0.45);
+  --shadow-sm: 0px 2px 6px -1px rgba(0,0,0,0.5);
+  --shadow: 0px 4px 14px -2px rgba(0,0,0,0.55);
+  --shadow-md: 0px 8px 26px -4px rgba(0,0,0,0.6);
+  --shadow-lg: 0px 16px 50px -8px rgba(0,0,0,0.65);
+  --shadow-xl: 0px 24px 68px -12px rgba(0,0,0,0.7);
+  --shadow-2xl: 0px 40px 85px -16px rgba(0,0,0,0.8);
 
   --sidebar-primary-border: hsl(from hsl(var(--sidebar-primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
   --sidebar-accent-border: hsl(from hsl(var(--sidebar-accent)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
