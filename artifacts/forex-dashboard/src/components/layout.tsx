@@ -71,13 +71,38 @@ function LiveClock() {
   );
 }
 
+import { useQuery } from "@tanstack/react-query";
+
+async function fetchMT5Summary() {
+  const token = localStorage.getItem("forex_access_token") || localStorage.getItem("nexus_access_token");
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch("/api/v1/mt5/summary?days=30", { headers });
+  if (!res.ok) throw new Error("Failed to fetch MT5 summary");
+  return res.json();
+}
+
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { data: summary, isLoading } = useGetDashboardSummary();
   const { connected: wsConnected } = useLivePrices();
 
-  const botStatus      = isLoading ? null : (summary?.botStatus || "running");
-  const isMt5Active    = Boolean((summary as any)?.mt5Connected || (summary as any)?.mt5_connected);
+  // Unified MT5 live status shared with dashboard
+  const { data: mt5Data } = useQuery({
+    queryKey: ["mt5-summary"],
+    queryFn: fetchMT5Summary,
+    refetchInterval: 5000,
+    retry: 2,
+  });
+
+  const isMt5Active = Boolean(
+    mt5Data?.connected ||
+    (summary as any)?.mt5Connected ||
+    (summary as any)?.mt5_connected
+  );
+  const mt5Account = mt5Data?.account;
+
+  const botStatus = isLoading ? null : (summary?.botStatus || (isMt5Active ? "running" : "stopped"));
 
   return (
     <div className="flex h-screen overflow-hidden bg-background font-sans text-foreground selection:bg-primary/20 selection:text-primary">
@@ -202,16 +227,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <div className="hidden sm:flex items-center gap-2 border-l border-border/60 pl-3">
               {/* MT5 Pill */}
               <div className={cn(
-                "flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border",
+                "flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border",
                 isMt5Active
                   ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
                   : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
               )}>
                 <span className={cn(
                   "w-1.5 h-1.5 rounded-full",
-                  isMt5Active ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
+                  isMt5Active ? "bg-emerald-500 animate-pulse shadow-[0_0_6px_rgba(16,185,129,0.7)]" : "bg-amber-500"
                 )} />
-                <span>MT5: {isMt5Active ? "ONLINE" : "STANDBY"}</span>
+                <span>MT5: {isMt5Active ? "CONNECTED" : "OFFLINE"}</span>
               </div>
 
               {/* News Pill */}
