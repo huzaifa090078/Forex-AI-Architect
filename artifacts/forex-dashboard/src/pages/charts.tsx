@@ -155,7 +155,7 @@ export default function ChartsPage() {
       height: container.clientHeight,
     });
 
-    const candleSeries = chart.addCandlestickSeries({
+    const candleSeries = chart.addSeries(CandlestickSeries, {
       upColor:          upClr,
       downColor:        downClr,
       borderUpColor:    upClr,
@@ -164,13 +164,13 @@ export default function ChartsPage() {
       wickDownColor:    downClr,
     });
 
-    const ema20Series = chart.addLineSeries({
+    const ema20Series = chart.addSeries(LineSeries, {
       color: "#38bdf8",
       lineWidth: 1.5,
       title: "EMA 20",
     });
 
-    const ema50Series = chart.addLineSeries({
+    const ema50Series = chart.addSeries(LineSeries, {
       color: "#f59e0b",
       lineWidth: 1.5,
       title: "EMA 50",
